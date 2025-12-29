@@ -15,12 +15,12 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper functions for localStorage
-const getAnalysisKey = (symbol: string, timeframe: string) => `analysis_${symbol}_${timeframe}`;
+// Helper functions for localStorage - cache by symbol only (not timeframe)
+const getAnalysisKey = (symbol: string) => `analysis_${symbol}`;
 
-const saveAnalysis = (symbol: string, timeframe: string, analysis: TechnicalAnalysis) => {
+const saveAnalysis = (symbol: string, analysis: TechnicalAnalysis) => {
   try {
-    const key = getAnalysisKey(symbol, timeframe);
+    const key = getAnalysisKey(symbol);
     const data = {
       analysis,
       timestamp: Date.now(),
@@ -31,16 +31,18 @@ const saveAnalysis = (symbol: string, timeframe: string, analysis: TechnicalAnal
   }
 };
 
-const loadAnalysis = (symbol: string, timeframe: string): TechnicalAnalysis | null => {
+const loadAnalysis = (symbol: string): TechnicalAnalysis | null => {
   try {
-    const key = getAnalysisKey(symbol, timeframe);
+    const key = getAnalysisKey(symbol);
     const stored = localStorage.getItem(key);
     if (!stored) return null;
     
     const data = JSON.parse(stored);
-    // Check if data is less than 24 hours old
-    const isValid = Date.now() - data.timestamp < 24 * 60 * 60 * 1000;
-    return isValid ? data.analysis : null;
+    // Check if data is from today (same calendar day)
+    const storedDate = new Date(data.timestamp);
+    const today = new Date();
+    const isSameDay = storedDate.toDateString() === today.toDateString();
+    return isSameDay ? data.analysis : null;
   } catch (e) {
     console.warn('Failed to load analysis from localStorage:', e);
     return null;
@@ -76,8 +78,8 @@ const Index = () => {
       setSnapshot(snapshotData);
       setIndicators(calculateIndicators(klinesData));
       
-      // Load cached analysis for this symbol/timeframe
-      const cachedAnalysis = loadAnalysis(symbol, timeframe);
+      // Load cached analysis for this symbol (shared across all timeframes)
+      const cachedAnalysis = loadAnalysis(symbol);
       setAnalysis(cachedAnalysis);
     } catch (error) {
       toast({
@@ -157,7 +159,7 @@ const Index = () => {
       
       if (parsedAnalysis) {
         setAnalysis(parsedAnalysis);
-        saveAnalysis(symbol, timeframe, parsedAnalysis);
+        saveAnalysis(symbol, parsedAnalysis);
         toast({
           title: 'AI分析完成',
           description: '技术分析报告已生成并缓存',
@@ -208,7 +210,7 @@ const Index = () => {
           }
         };
         setAnalysis(mockAnalysis);
-        saveAnalysis(symbol, timeframe, mockAnalysis);
+        saveAnalysis(symbol, mockAnalysis);
         toast({
           title: 'AI分析完成',
           description: '使用本地计算结果（AI响应解析失败）',
