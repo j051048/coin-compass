@@ -12,6 +12,7 @@ import { IndicatorPanel } from '@/components/IndicatorPanel';
 import { AnalysisReport } from '@/components/AnalysisReport';
 import { ApiConfigDialog, getApiConfig } from '@/components/ApiConfigDialog';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { WalletButton } from '@/components/WalletButton';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -242,6 +243,7 @@ const Index = () => {
               </div>
               <SymbolSearch value={symbol} onChange={setSymbol} />
               <ThemeSwitcher />
+              <WalletButton />
             </div>
             
             <div className="flex items-center gap-3">
