@@ -5,6 +5,14 @@ const OKX_BASE_URL = 'https://www.okx.com/api/v5';
 const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
 const GATE_BASE_URL = 'https://api.gateio.ws/api/v4';
 
+// Data source type
+export type DataSource = 'OKX' | 'Gate' | 'Binance';
+
+// Extended market snapshot with data source
+export interface MarketSnapshotWithSource extends MarketSnapshot {
+  dataSource: DataSource;
+}
+
 // Convert symbol format: BTCUSDT -> BTC-USDT
 function toOkxSymbol(symbol: string): string {
   if (symbol.endsWith('USDT')) {
@@ -274,24 +282,27 @@ export async function fetchKlines(
   }
 }
 
-export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
+export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshotWithSource> {
   // Try OKX first
   try {
-    return await fetchMarketSnapshotFromOkx(symbol);
+    const data = await fetchMarketSnapshotFromOkx(symbol);
+    return { ...data, dataSource: 'OKX' };
   } catch (okxError) {
     console.log('OKX failed, trying Gate.io...', okxError);
   }
   
   // Try Gate.io second (good for meme coins)
   try {
-    return await fetchMarketSnapshotFromGate(symbol);
+    const data = await fetchMarketSnapshotFromGate(symbol);
+    return { ...data, dataSource: 'Gate' };
   } catch (gateError) {
     console.log('Gate.io failed, trying Binance...', gateError);
   }
   
   // Try Binance last
   try {
-    return await fetchMarketSnapshotFromBinance(symbol);
+    const data = await fetchMarketSnapshotFromBinance(symbol);
+    return { ...data, dataSource: 'Binance' };
   } catch (binanceError) {
     console.error('All APIs failed:', binanceError);
     throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/Gate.io/Binance）');
