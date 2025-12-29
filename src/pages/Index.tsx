@@ -352,7 +352,7 @@ const Index = () => {
           </div>
 
           {/* Right Panel - Indicators & Analysis */}
-          <div className="lg:col-span-4 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)] scrollbar-thin">
+          <div className="lg:col-span-4 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)] pr-2 scrollbar-custom">
             <IndicatorPanel 
               indicators={indicators} 
               currentPrice={snapshot?.price || 0} 
