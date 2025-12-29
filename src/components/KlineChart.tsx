@@ -62,6 +62,11 @@ const createSubChart = (container: HTMLDivElement, height: number) => {
   });
 };
 
+// Store series refs for proper cleanup
+interface SubChartSeries {
+  series: ISeriesApi<any>[];
+}
+
 export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD = false, showRSI = false, showKDJ = false, showWR = false }: KlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
@@ -77,6 +82,13 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
   const rsiChartRef = useRef<IChartApi | null>(null);
   const kdjChartRef = useRef<IChartApi | null>(null);
   const wrChartRef = useRef<IChartApi | null>(null);
+  
+  // Series refs for cleanup
+  const volSeriesRef = useRef<SubChartSeries>({ series: [] });
+  const macdSeriesRef = useRef<SubChartSeries>({ series: [] });
+  const rsiSeriesRef = useRef<SubChartSeries>({ series: [] });
+  const kdjSeriesRef = useRef<SubChartSeries>({ series: [] });
+  const wrSeriesRef = useRef<SubChartSeries>({ series: [] });
   
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const maSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
@@ -324,6 +336,12 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
     if (showVOL && volChartRef.current) {
       const volChart = volChartRef.current;
       
+      // Clear previous series
+      volSeriesRef.current.series.forEach(s => {
+        try { volChart.removeSeries(s); } catch (e) { /* ignore */ }
+      });
+      volSeriesRef.current.series = [];
+      
       const volSeries = volChart.addHistogramSeries({
         priceLineVisible: false,
         lastValueVisible: false,
@@ -340,12 +358,19 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
       });
 
       volSeries.setData(volData);
+      volSeriesRef.current.series.push(volSeries);
       volChart.timeScale().fitContent();
     }
 
     // MACD data
     if (showMACD && macdChartRef.current) {
       const macdChart = macdChartRef.current;
+      
+      // Clear previous series
+      macdSeriesRef.current.series.forEach(s => {
+        try { macdChart.removeSeries(s); } catch (e) { /* ignore */ }
+      });
+      macdSeriesRef.current.series = [];
       
       const histogramSeries = macdChart.addHistogramSeries({
         priceLineVisible: false,
@@ -392,12 +417,19 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
         .filter((d) => d.value !== null) as LineData[];
 
       signalSeries.setData(signalData);
+      macdSeriesRef.current.series.push(histogramSeries, macdLineSeries, signalSeries);
       macdChart.timeScale().fitContent();
     }
 
     // RSI data - dual RSI (13 and 42)
     if (showRSI && rsiChartRef.current) {
       const rsiChart = rsiChartRef.current;
+      
+      // Clear previous series
+      rsiSeriesRef.current.series.forEach(s => {
+        try { rsiChart.removeSeries(s); } catch (e) { /* ignore */ }
+      });
+      rsiSeriesRef.current.series = [];
       
       // RSI(13) - 4h level
       const rsi13Series = rsiChart.addLineSeries({
@@ -428,6 +460,7 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
         .filter((d) => d.value !== null) as LineData[];
 
       rsi42Series.setData(rsi42Data);
+      rsiSeriesRef.current.series.push(rsi13Series, rsi42Series);
 
       rsiChart.timeScale().fitContent();
     }
@@ -435,6 +468,12 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
     // KDJ data
     if (showKDJ && kdjChartRef.current) {
       const kdjChart = kdjChartRef.current;
+      
+      // Clear previous series
+      kdjSeriesRef.current.series.forEach(s => {
+        try { kdjChart.removeSeries(s); } catch (e) { /* ignore */ }
+      });
+      kdjSeriesRef.current.series = [];
       
       const kSeries = kdjChart.addLineSeries({
         color: COLORS.kLine,
@@ -475,12 +514,19 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
       kSeries.setData(kData);
       dSeries.setData(dData);
       jSeries.setData(jData);
+      kdjSeriesRef.current.series.push(kSeries, dSeries, jSeries);
       kdjChart.timeScale().fitContent();
     }
 
     // W%R data
     if (showWR && wrChartRef.current) {
       const wrChart = wrChartRef.current;
+      
+      // Clear previous series
+      wrSeriesRef.current.series.forEach(s => {
+        try { wrChart.removeSeries(s); } catch (e) { /* ignore */ }
+      });
+      wrSeriesRef.current.series = [];
       
       const wrSeries = wrChart.addLineSeries({
         color: COLORS.ma7,
@@ -495,6 +541,7 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
         .filter((d) => d.value !== null) as LineData[];
 
       wrSeries.setData(wrData);
+      wrSeriesRef.current.series.push(wrSeries);
       wrChart.timeScale().fitContent();
     }
 
@@ -519,7 +566,7 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
         )}
         {showRSI && (
           <div className="border-t border-border/50">
-            <div className="text-[10px] text-muted-foreground px-2 py-1">RSI (14)</div>
+            <div className="text-[10px] text-muted-foreground px-2 py-1">RSI (13/42)</div>
             <div ref={rsiContainerRef} className="w-full" style={{ height: subChartHeight }} />
           </div>
         )}
