@@ -335,13 +335,15 @@ async function fetchBinanceSymbols(): Promise<string[]> {
 }
 
 async function fetchGateSymbols(): Promise<string[]> {
-  const response = await fetch(`${GATE_BASE_URL}/spot/currency_pairs`);
-  if (!response.ok) throw new Error('Failed to fetch Gate.io symbols');
-  
-  const data = await response.json();
-  return data
-    .filter((s: any) => s.quote === 'USDT' && s.trade_status === 'tradable')
-    .map((s: any) => s.id.replace('_', ''));
+  // Gate.io API has CORS restrictions, so we maintain a curated list of popular meme coins
+  // that are available on Gate.io but not on other exchanges
+  const GATE_MEME_COINS = [
+    'PIPPINUSDT', 'GOATUSDT', 'ACTUSDT', 'PNUTUSDT', 'NEIROUSDT',
+    'MOGUSDT', 'SPXUSDT', 'GLOWYUSDT', 'TOSHIUSDT', 'BRETTUSDT',
+    'POPCATUSDT', 'GIGAUSDT', 'MIKIUSDT', 'SUNWUKONGUSDT', 'RETARDUSDT',
+    'LOCKINUSDT', 'GRIFFAINUSDT', 'AI16ZUSDT', 'FARTCOINUSDT', 'ZEREBRUSDT',
+  ];
+  return GATE_MEME_COINS;
 }
 
 async function fetchAllSymbols(): Promise<string[]> {
