@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, LineData } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, LineData, HistogramData } from 'lightweight-charts';
 import { Kline } from '@/types/trading';
 import { getIndicatorSeries } from '@/lib/indicators';
 
@@ -14,25 +14,78 @@ const COLORS = {
   ma7: '#0ea5e9',       // sky blue
   ma21: '#a855f7',      // purple
   ma50: '#eab308',      // yellow
+  kLine: '#eab308',     // K line yellow
+  dLine: '#0ea5e9',     // D line blue
+  jLine: '#a855f7',     // J line purple
 };
 
 interface KlineChartProps {
   klines: Kline[];
   showMA: boolean;
   showBB: boolean;
+  showMACD?: boolean;
+  showRSI?: boolean;
+  showKDJ?: boolean;
+  showWR?: boolean;
 }
 
-export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
+const createSubChart = (container: HTMLDivElement, height: number) => {
+  return createChart(container, {
+    height,
+    layout: {
+      background: { color: 'transparent' },
+      textColor: COLORS.text,
+      fontFamily: 'JetBrains Mono, monospace',
+    },
+    grid: {
+      vertLines: { color: COLORS.grid },
+      horzLines: { color: COLORS.grid },
+    },
+    rightPriceScale: {
+      borderColor: COLORS.border,
+    },
+    timeScale: {
+      borderColor: COLORS.border,
+      timeVisible: true,
+      secondsVisible: false,
+      visible: false,
+    },
+    handleScale: {
+      axisPressedMouseMove: true,
+    },
+    handleScroll: {
+      vertTouchDrag: false,
+    },
+  });
+};
+
+export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI = false, showKDJ = false, showWR = false }: KlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const macdContainerRef = useRef<HTMLDivElement>(null);
+  const rsiContainerRef = useRef<HTMLDivElement>(null);
+  const kdjContainerRef = useRef<HTMLDivElement>(null);
+  const wrContainerRef = useRef<HTMLDivElement>(null);
+  
   const chartRef = useRef<IChartApi | null>(null);
+  const macdChartRef = useRef<IChartApi | null>(null);
+  const rsiChartRef = useRef<IChartApi | null>(null);
+  const kdjChartRef = useRef<IChartApi | null>(null);
+  const wrChartRef = useRef<IChartApi | null>(null);
+  
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const maSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const bbSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // Calculate active sub-charts count for height distribution
+  const subChartCount = [showMACD, showRSI, showKDJ, showWR].filter(Boolean).length;
+  const mainChartHeight = subChartCount > 0 ? 320 : 400;
+  const subChartHeight = subChartCount > 0 ? Math.floor(180 / subChartCount) : 0;
 
-    const chart = createChart(containerRef.current, {
+  useEffect(() => {
+    if (!mainContainerRef.current) return;
+
+    const chart = createChart(mainContainerRef.current, {
       layout: {
         background: { color: 'transparent' },
         textColor: COLORS.text,
@@ -44,31 +97,13 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       },
       crosshair: {
         mode: 1,
-        vertLine: {
-          color: COLORS.accent,
-          width: 1,
-          style: 2,
-        },
-        horzLine: {
-          color: COLORS.accent,
-          width: 1,
-          style: 2,
-        },
+        vertLine: { color: COLORS.accent, width: 1, style: 2 },
+        horzLine: { color: COLORS.accent, width: 1, style: 2 },
       },
-      rightPriceScale: {
-        borderColor: COLORS.border,
-      },
-      timeScale: {
-        borderColor: COLORS.border,
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-      },
-      handleScroll: {
-        vertTouchDrag: false,
-      },
+      rightPriceScale: { borderColor: COLORS.border },
+      timeScale: { borderColor: COLORS.border, timeVisible: true, secondsVisible: false },
+      handleScale: { axisPressedMouseMove: true },
+      handleScroll: { vertTouchDrag: false },
     });
 
     const candleSeries = chart.addCandlestickSeries({
@@ -84,10 +119,10 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
     candleSeriesRef.current = candleSeries;
 
     const handleResize = () => {
-      if (containerRef.current && chartRef.current) {
+      if (mainContainerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
+          width: mainContainerRef.current.clientWidth,
+          height: mainChartHeight,
         });
       }
     };
@@ -99,7 +134,83 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, []);
+  }, [mainChartHeight]);
+
+  // MACD sub-chart
+  useEffect(() => {
+    if (!showMACD || !macdContainerRef.current) {
+      if (macdChartRef.current) {
+        macdChartRef.current.remove();
+        macdChartRef.current = null;
+      }
+      return;
+    }
+
+    const chart = createSubChart(macdContainerRef.current, subChartHeight);
+    macdChartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      macdChartRef.current = null;
+    };
+  }, [showMACD, subChartHeight]);
+
+  // RSI sub-chart
+  useEffect(() => {
+    if (!showRSI || !rsiContainerRef.current) {
+      if (rsiChartRef.current) {
+        rsiChartRef.current.remove();
+        rsiChartRef.current = null;
+      }
+      return;
+    }
+
+    const chart = createSubChart(rsiContainerRef.current, subChartHeight);
+    rsiChartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      rsiChartRef.current = null;
+    };
+  }, [showRSI, subChartHeight]);
+
+  // KDJ sub-chart
+  useEffect(() => {
+    if (!showKDJ || !kdjContainerRef.current) {
+      if (kdjChartRef.current) {
+        kdjChartRef.current.remove();
+        kdjChartRef.current = null;
+      }
+      return;
+    }
+
+    const chart = createSubChart(kdjContainerRef.current, subChartHeight);
+    kdjChartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      kdjChartRef.current = null;
+    };
+  }, [showKDJ, subChartHeight]);
+
+  // W%R sub-chart
+  useEffect(() => {
+    if (!showWR || !wrContainerRef.current) {
+      if (wrChartRef.current) {
+        wrChartRef.current.remove();
+        wrChartRef.current = null;
+      }
+      return;
+    }
+
+    const chart = createSubChart(wrContainerRef.current, subChartHeight);
+    wrChartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      wrChartRef.current = null;
+    };
+  }, [showWR, subChartHeight]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -137,7 +248,7 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       ];
 
       maConfigs.forEach(({ data, color, title }) => {
-        const series = chartRef.current!.addLineSeries({
+        const series = chart.addLineSeries({
           color,
           lineWidth: 1,
           title,
@@ -165,7 +276,7 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       ];
 
       bbConfigs.forEach(({ key, color, title }) => {
-        const series = chartRef.current!.addLineSeries({
+        const series = chart.addLineSeries({
           color,
           lineWidth: 1,
           lineStyle: key === 'middle' ? 0 : 2,
@@ -186,12 +297,174 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       });
     }
 
-    chartRef.current.timeScale().fitContent();
-  }, [klines, showMA, showBB]);
+    // MACD data
+    if (showMACD && macdChartRef.current) {
+      const macdChart = macdChartRef.current;
+      
+      const histogramSeries = macdChart.addHistogramSeries({
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const histogramData: HistogramData[] = klines
+        .map((k, i) => {
+          const val = indicators.macd[i]?.histogram;
+          return {
+            time: k.time as any,
+            value: val ?? 0,
+            color: (val ?? 0) >= 0 ? COLORS.bull : COLORS.bear,
+          };
+        })
+        .filter((d) => d.value !== 0);
+
+      histogramSeries.setData(histogramData);
+
+      const macdLineSeries = macdChart.addLineSeries({
+        color: COLORS.ma7,
+        lineWidth: 1,
+        title: 'DIF',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const macdLineData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.macd[i]?.macd }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      macdLineSeries.setData(macdLineData);
+
+      const signalSeries = macdChart.addLineSeries({
+        color: COLORS.ma50,
+        lineWidth: 1,
+        title: 'DEA',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const signalData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.macd[i]?.signal }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      signalSeries.setData(signalData);
+      macdChart.timeScale().fitContent();
+    }
+
+    // RSI data
+    if (showRSI && rsiChartRef.current) {
+      const rsiChart = rsiChartRef.current;
+      
+      const rsiSeries = rsiChart.addLineSeries({
+        color: COLORS.ma21,
+        lineWidth: 1,
+        title: 'RSI',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const rsiData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.rsi[i] }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      rsiSeries.setData(rsiData);
+      rsiChart.timeScale().fitContent();
+    }
+
+    // KDJ data
+    if (showKDJ && kdjChartRef.current) {
+      const kdjChart = kdjChartRef.current;
+      
+      const kSeries = kdjChart.addLineSeries({
+        color: COLORS.kLine,
+        lineWidth: 1,
+        title: 'K',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const dSeries = kdjChart.addLineSeries({
+        color: COLORS.dLine,
+        lineWidth: 1,
+        title: 'D',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const jSeries = kdjChart.addLineSeries({
+        color: COLORS.jLine,
+        lineWidth: 1,
+        title: 'J',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const kData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.kdj[i]?.k }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      const dData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.kdj[i]?.d }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      const jData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.kdj[i]?.j }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      kSeries.setData(kData);
+      dSeries.setData(dData);
+      jSeries.setData(jData);
+      kdjChart.timeScale().fitContent();
+    }
+
+    // W%R data
+    if (showWR && wrChartRef.current) {
+      const wrChart = wrChartRef.current;
+      
+      const wrSeries = wrChart.addLineSeries({
+        color: COLORS.ma7,
+        lineWidth: 1,
+        title: 'W%R',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const wrData: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.williamsR[i] }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      wrSeries.setData(wrData);
+      wrChart.timeScale().fitContent();
+    }
+
+    chart.timeScale().fitContent();
+  }, [klines, showMA, showBB, showMACD, showRSI, showKDJ, showWR]);
 
   return (
-    <div className="chart-container w-full h-full min-h-[400px]">
-      <div ref={containerRef} className="w-full h-full" />
+    <div ref={containerRef} className="chart-container w-full h-full min-h-[400px] flex flex-col">
+      <div ref={mainContainerRef} className="w-full flex-1" style={{ minHeight: mainChartHeight }} />
+      {showMACD && (
+        <div className="border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground px-2 py-1">MACD</div>
+          <div ref={macdContainerRef} className="w-full" style={{ height: subChartHeight }} />
+        </div>
+      )}
+      {showRSI && (
+        <div className="border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground px-2 py-1">RSI (14)</div>
+          <div ref={rsiContainerRef} className="w-full" style={{ height: subChartHeight }} />
+        </div>
+      )}
+      {showKDJ && (
+        <div className="border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground px-2 py-1">KDJ</div>
+          <div ref={kdjContainerRef} className="w-full" style={{ height: subChartHeight }} />
+        </div>
+      )}
+      {showWR && (
+        <div className="border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground px-2 py-1">W%R (14)</div>
+          <div ref={wrContainerRef} className="w-full" style={{ height: subChartHeight }} />
+        </div>
+      )}
     </div>
   );
 }
