@@ -11,6 +11,7 @@ import { KlineChart } from '@/components/KlineChart';
 import { IndicatorPanel } from '@/components/IndicatorPanel';
 import { AnalysisReport } from '@/components/AnalysisReport';
 import { ApiConfigDialog, getApiConfig } from '@/components/ApiConfigDialog';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -200,6 +201,7 @@ const Index = () => {
                 <h1 className="text-lg font-bold gold-text">K线分析大师</h1>
               </div>
               <SymbolSearch value={symbol} onChange={setSymbol} />
+              <ThemeSwitcher />
             </div>
             
             <div className="flex items-center gap-3">
