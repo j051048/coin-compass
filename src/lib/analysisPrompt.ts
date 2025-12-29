@@ -1,4 +1,5 @@
 import { Kline, IndicatorValues, TechnicalAnalysis, TimeFrame } from '@/types/trading';
+import { getSkillEnhancedPrompt, ACTIVE_SKILL } from './skills';
 
 export function generateAnalysisPrompt(
   symbol: string,
@@ -20,7 +21,28 @@ export function generateAnalysisPrompt(
   const highestRecent = Math.max(...recent.map(k => k.high));
   const lowestRecent = Math.min(...recent.map(k => k.low));
 
-  return `你是币圈顶级量化交易员+链上数据分析师+技术派K线大师，经验超过10年。只说干货，不废话，不预测"一定会涨/跌"，只给高概率情景+风险提示。
+  // Load skill/gem for enhanced analysis
+  const skillPrompt = getSkillEnhancedPrompt();
+
+  return `## 已加载技能库: ${ACTIVE_SKILL.name} (v${ACTIVE_SKILL.version})
+## 技能作者: ${ACTIVE_SKILL.author}
+
+${skillPrompt}
+
+## 分析流程（严格执行，输出必须按此顺序）
+
+1. 当前结构概览（时间框架、交易对、价位区间）
+2. 大神视角关键形态识别（优先列顶级形态）
+3. 量价+指标共振点（成交量变化最重要）
+4. 多周期一致性 + 关键位分析
+5. 大神共振信号是否出现？（列出匹配的顶级/次顶级组合）
+6. 概率评估（上涨/震荡/下跌%区间 + 主要依据）
+7. 交易思路（情景推演+观察区+结构止损位+RRR预估+失效信号）
+8. 终极风控提醒（每条回复必出现）
+
+---
+
+## 当前市场数据
 
 交易对: ${symbol}
 时间框架: ${timeframe}
@@ -40,11 +62,18 @@ export function generateAnalysisPrompt(
 近30根K线数据:
 ${JSON.stringify(priceData, null, 2)}
 
+---
+
 请严格按以下JSON格式输出分析结果（不要添加任何其他内容）:
 {
-  "snapshot": "1-7天行情快照，包含价格走势、成交量变化、关键支撑阻力位",
-  "indicators": "技术指标解读，包含均线、MACD、RSI、布林带、成交量异动、K线形态分析",
-  "timeframes": "多时间框架共振分析，是否存在强势信号或背离预警",
+  "snapshot": "【结构与价位】当前所处位置、价位区间、结构描述",
+  "patterns": "【大神级形态识别】识别到的顶级/次顶级形态及历史胜率参考",
+  "indicators": "【量价+指标共振】成交量关键变化、RSI/MACD/布林分析、资金费率/链上辅助信号",
+  "timeframes": "【多周期一致性】周/日/4h/1h各级别趋势及一致性评级（极高/高/中/低）",
+  "resonance": {
+    "rating": "大神共振信号匹配度（5星制，如★★★★☆）",
+    "strongestSignal": "当前最强信号描述"
+  },
   "scenarios": [
     {
       "type": "bull",
@@ -52,7 +81,8 @@ ${JSON.stringify(priceData, null, 2)}
       "trigger": "突破某价位",
       "target": 目标价格数字,
       "stopLoss": 止损价格数字,
-      "description": "详细描述"
+      "rrr": "风险回报比如1:3",
+      "description": "多头情景详细描述"
     },
     {
       "type": "bear",
@@ -60,7 +90,8 @@ ${JSON.stringify(priceData, null, 2)}
       "trigger": "跌破某价位",
       "target": 目标价格数字,
       "stopLoss": 止损价格数字,
-      "description": "详细描述"
+      "rrr": "风险回报比如1:2.5",
+      "description": "空头情景详细描述"
     },
     {
       "type": "neutral",
@@ -68,10 +99,12 @@ ${JSON.stringify(priceData, null, 2)}
       "trigger": "区间震荡",
       "target": 目标价格数字,
       "stopLoss": 止损价格数字,
-      "description": "详细描述"
+      "rrr": "风险回报比",
+      "description": "震荡情景详细描述"
     }
   ],
-  "risks": ["风险1", "风险2", "风险3"],
+  "invalidSignal": "最强失效信号描述",
+  "risks": ["风险1", "风险2", "风险3", "【终极风控】加密市场瞬息万变，巨鲸操控+黑天鹅随时出现，此分析仅为概率参考，不构成任何投资建议。永远只用闲钱，单笔风险严格控制在1-2%，杠杆不超过5x。"],
   "summary": {
     "stance": "aggressive/stable/wait",
     "position": 0到100的数字表示建议仓位,

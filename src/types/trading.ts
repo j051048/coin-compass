@@ -41,14 +41,23 @@ export interface AnalysisScenario {
   trigger: string;
   target: number;
   stopLoss: number;
+  rrr?: string;
   description: string;
+}
+
+export interface ResonanceRating {
+  rating: string;
+  strongestSignal: string;
 }
 
 export interface TechnicalAnalysis {
   snapshot: string;
+  patterns?: string;
   indicators: string;
   timeframes: string;
+  resonance?: ResonanceRating;
   scenarios: AnalysisScenario[];
+  invalidSignal?: string;
   risks: string[];
   summary: {
     stance: 'aggressive' | 'stable' | 'wait';
