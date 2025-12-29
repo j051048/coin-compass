@@ -1,11 +1,11 @@
 import { Kline, MarketSnapshot, TimeFrame } from '@/types/trading';
 
-// OKX API (better CORS support)
+// API endpoints
 const OKX_BASE_URL = 'https://www.okx.com/api/v5';
+const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
 
 // Convert symbol format: BTCUSDT -> BTC-USDT
 function toOkxSymbol(symbol: string): string {
-  // Handle common patterns
   if (symbol.endsWith('USDT')) {
     return symbol.replace('USDT', '-USDT');
   }
@@ -29,10 +29,11 @@ function toOkxInterval(interval: TimeFrame): string {
   return map[interval] || '1H';
 }
 
-export async function fetchKlines(
+// ============= OKX API =============
+async function fetchKlinesFromOkx(
   symbol: string,
   interval: TimeFrame,
-  limit: number = 200
+  limit: number
 ): Promise<Kline[]> {
   const okxSymbol = toOkxSymbol(symbol);
   const okxInterval = toOkxInterval(interval);
@@ -42,17 +43,16 @@ export async function fetchKlines(
   );
   
   if (!response.ok) {
-    throw new Error('Failed to fetch klines');
+    throw new Error('OKX API request failed');
   }
   
   const result = await response.json();
   
   if (result.code !== '0' || !result.data) {
-    throw new Error(result.msg || 'Failed to fetch klines');
+    throw new Error(result.msg || 'OKX data error');
   }
   
   // OKX returns: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
-  // Data is in reverse order (newest first), so we reverse it
   return result.data
     .map((k: string[]) => ({
       time: parseInt(k[0]) / 1000,
@@ -65,7 +65,7 @@ export async function fetchKlines(
     .reverse();
 }
 
-export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
+async function fetchMarketSnapshotFromOkx(symbol: string): Promise<MarketSnapshot> {
   const okxSymbol = toOkxSymbol(symbol);
   
   const response = await fetch(
@@ -73,13 +73,13 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
   );
   
   if (!response.ok) {
-    throw new Error('Failed to fetch market data');
+    throw new Error('OKX API request failed');
   }
   
   const result = await response.json();
   
   if (result.code !== '0' || !result.data?.[0]) {
-    throw new Error(result.msg || 'Failed to fetch market data');
+    throw new Error(result.msg || 'OKX data error');
   }
   
   const ticker = result.data[0];
@@ -99,54 +99,158 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
   };
 }
 
-// Popular trading pairs for quick access
+// ============= Binance API =============
+async function fetchKlinesFromBinance(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number
+): Promise<Kline[]> {
+  const response = await fetch(
+    `${BINANCE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Binance API request failed');
+  }
+  
+  const data = await response.json();
+  
+  return data.map((k: any[]) => ({
+    time: k[0] / 1000,
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
+}
+
+async function fetchMarketSnapshotFromBinance(symbol: string): Promise<MarketSnapshot> {
+  const [tickerResponse, priceResponse] = await Promise.all([
+    fetch(`${BINANCE_BASE_URL}/ticker/24hr?symbol=${symbol}`),
+    fetch(`${BINANCE_BASE_URL}/ticker/price?symbol=${symbol}`),
+  ]);
+  
+  if (!tickerResponse.ok || !priceResponse.ok) {
+    throw new Error('Binance API request failed');
+  }
+  
+  const ticker = await tickerResponse.json();
+  const price = await priceResponse.json();
+  
+  return {
+    symbol,
+    price: parseFloat(price.price),
+    change24h: parseFloat(ticker.priceChange),
+    changePercent24h: parseFloat(ticker.priceChangePercent),
+    high24h: parseFloat(ticker.highPrice),
+    low24h: parseFloat(ticker.lowPrice),
+    volume24h: parseFloat(ticker.volume),
+  };
+}
+
+// ============= Unified API with fallback =============
+export async function fetchKlines(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number = 200
+): Promise<Kline[]> {
+  // Try OKX first, fallback to Binance
+  try {
+    return await fetchKlinesFromOkx(symbol, interval, limit);
+  } catch (okxError) {
+    console.log('OKX failed, trying Binance...', okxError);
+    try {
+      return await fetchKlinesFromBinance(symbol, interval, limit);
+    } catch (binanceError) {
+      console.error('Both APIs failed:', binanceError);
+      throw new Error('无法获取K线数据，请检查交易对是否正确');
+    }
+  }
+}
+
+export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
+  // Try OKX first, fallback to Binance
+  try {
+    return await fetchMarketSnapshotFromOkx(symbol);
+  } catch (okxError) {
+    console.log('OKX failed, trying Binance...', okxError);
+    try {
+      return await fetchMarketSnapshotFromBinance(symbol);
+    } catch (binanceError) {
+      console.error('Both APIs failed:', binanceError);
+      throw new Error('无法获取行情数据，请检查交易对是否正确');
+    }
+  }
+}
+
+// ============= Symbol Search =============
 const POPULAR_SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
   'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
 ];
 
-// Cache for symbols list
-let symbolsCache: string[] | null = null;
+// Caches
+let okxSymbolsCache: string[] = [];
+let binanceSymbolsCache: string[] = [];
 let cacheTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+async function fetchOkxSymbols(): Promise<string[]> {
+  const response = await fetch(`${OKX_BASE_URL}/public/instruments?instType=SPOT`);
+  if (!response.ok) throw new Error('Failed to fetch OKX symbols');
+  
+  const result = await response.json();
+  if (result.code !== '0' || !result.data) throw new Error('OKX symbols error');
+  
+  return result.data
+    .filter((s: any) => s.quoteCcy === 'USDT' && s.state === 'live')
+    .map((s: any) => s.instId.replace('-', ''));
+}
+
+async function fetchBinanceSymbols(): Promise<string[]> {
+  const response = await fetch(`${BINANCE_BASE_URL}/exchangeInfo`);
+  if (!response.ok) throw new Error('Failed to fetch Binance symbols');
+  
+  const data = await response.json();
+  return data.symbols
+    .filter((s: any) => s.status === 'TRADING' && s.quoteAsset === 'USDT')
+    .map((s: any) => s.symbol);
+}
+
 async function fetchAllSymbols(): Promise<string[]> {
   // Return cache if valid
-  if (symbolsCache && Date.now() - cacheTime < CACHE_DURATION) {
-    return symbolsCache;
+  if (okxSymbolsCache.length > 0 && Date.now() - cacheTime < CACHE_DURATION) {
+    return [...new Set([...okxSymbolsCache, ...binanceSymbolsCache])];
   }
 
-  const response = await fetch(
-    `${OKX_BASE_URL}/public/instruments?instType=SPOT`
-  );
+  // Fetch from both exchanges in parallel
+  const [okxResult, binanceResult] = await Promise.allSettled([
+    fetchOkxSymbols(),
+    fetchBinanceSymbols(),
+  ]);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch symbols');
+  if (okxResult.status === 'fulfilled') {
+    okxSymbolsCache = okxResult.value;
+  }
+  if (binanceResult.status === 'fulfilled') {
+    binanceSymbolsCache = binanceResult.value;
   }
 
-  const result = await response.json();
-
-  if (result.code !== '0' || !result.data) {
-    throw new Error(result.msg || 'Failed to fetch symbols');
-  }
-
-  // Convert OKX format (BTC-USDT) to standard format (BTCUSDT)
-  // Filter only USDT pairs for simplicity
-  symbolsCache = result.data
-    .filter((s: any) => s.quoteCcy === 'USDT' && s.state === 'live')
-    .map((s: any) => s.instId.replace('-', ''))
-    .sort((a: string, b: string) => {
-      // Sort popular symbols first
-      const aPopular = POPULAR_SYMBOLS.indexOf(a);
-      const bPopular = POPULAR_SYMBOLS.indexOf(b);
-      if (aPopular !== -1 && bPopular !== -1) return aPopular - bPopular;
-      if (aPopular !== -1) return -1;
-      if (bPopular !== -1) return 1;
-      return a.localeCompare(b);
-    });
-  
   cacheTime = Date.now();
-  return symbolsCache;
+
+  // Merge and dedupe
+  const allSymbols = [...new Set([...okxSymbolsCache, ...binanceSymbolsCache])];
+  
+  // Sort with popular symbols first
+  return allSymbols.sort((a, b) => {
+    const aPopular = POPULAR_SYMBOLS.indexOf(a);
+    const bPopular = POPULAR_SYMBOLS.indexOf(b);
+    if (aPopular !== -1 && bPopular !== -1) return aPopular - bPopular;
+    if (aPopular !== -1) return -1;
+    if (bPopular !== -1) return 1;
+    return a.localeCompare(b);
+  });
 }
 
 export async function searchSymbols(query: string): Promise<string[]> {
@@ -154,19 +258,16 @@ export async function searchSymbols(query: string): Promise<string[]> {
     const allSymbols = await fetchAllSymbols();
     
     if (!query) {
-      return allSymbols.slice(0, 20);
+      return allSymbols.slice(0, 30);
     }
     
     return allSymbols
-      .filter((s: string) => s.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 20);
+      .filter((s) => s.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 30);
   } catch (error) {
-    // Fallback to popular symbols if API fails
     console.error('Failed to fetch symbols:', error);
-    if (!query) {
-      return POPULAR_SYMBOLS;
-    }
-    return POPULAR_SYMBOLS.filter((s: string) => 
+    if (!query) return POPULAR_SYMBOLS;
+    return POPULAR_SYMBOLS.filter((s) => 
       s.toLowerCase().includes(query.toLowerCase())
     );
   }
