@@ -1,29 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Palette, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const THEMES = {
+interface ThemeConfig {
+  id: string;
+  name: string;
+  primary: string;
+  accent: string;
+  bg: string;
+  cardBg: string;
+  foreground: string;
+  mutedFg: string;
+  border: string;
+}
+
+const THEMES: { young: ThemeConfig[]; middleAge: ThemeConfig[] } = {
   young: [
-    { id: 'neon-purple', name: '霓虹紫', primary: '270 95% 60%', accent: '280 100% 70%', bg: '270 50% 5%' },
-    { id: 'ocean-blue', name: '海洋蓝', primary: '200 100% 50%', accent: '190 100% 60%', bg: '210 50% 5%' },
-    { id: 'sunset-orange', name: '日落橙', primary: '25 100% 55%', accent: '35 100% 60%', bg: '20 40% 5%' },
-    { id: 'mint-green', name: '薄荷绿', primary: '160 70% 50%', accent: '150 80% 55%', bg: '165 40% 5%' },
+    { 
+      id: 'neon-purple', name: '霓虹紫', 
+      primary: '270 95% 60%', accent: '280 100% 70%', 
+      bg: '270 30% 6%', cardBg: '270 25% 10%',
+      foreground: '270 20% 95%', mutedFg: '270 15% 60%', border: '270 30% 20%'
+    },
+    { 
+      id: 'ocean-blue', name: '海洋蓝', 
+      primary: '200 100% 50%', accent: '190 100% 60%', 
+      bg: '210 40% 6%', cardBg: '210 35% 10%',
+      foreground: '200 20% 95%', mutedFg: '200 15% 60%', border: '210 30% 20%'
+    },
+    { 
+      id: 'sunset-orange', name: '日落橙', 
+      primary: '25 100% 55%', accent: '35 100% 60%', 
+      bg: '20 30% 6%', cardBg: '20 25% 10%',
+      foreground: '30 20% 95%', mutedFg: '25 15% 60%', border: '20 25% 20%'
+    },
+    { 
+      id: 'mint-green', name: '薄荷绿', 
+      primary: '160 70% 50%', accent: '150 80% 55%', 
+      bg: '165 30% 5%', cardBg: '165 25% 9%',
+      foreground: '160 20% 95%', mutedFg: '160 15% 60%', border: '165 25% 18%'
+    },
   ],
   middleAge: [
-    { id: 'classic-dark', name: '经典黑', primary: '220 15% 55%', accent: '220 20% 65%', bg: '220 15% 8%' },
-    { id: 'warm-gray', name: '暖灰色', primary: '30 20% 55%', accent: '35 25% 60%', bg: '30 10% 8%' },
-    { id: 'navy-blue', name: '藏青蓝', primary: '215 50% 45%', accent: '210 55% 55%', bg: '220 30% 8%' },
-    { id: 'forest-green', name: '森林绿', primary: '140 35% 40%', accent: '135 40% 50%', bg: '145 25% 6%' },
+    { 
+      id: 'classic-dark', name: '经典黑', 
+      primary: '220 15% 55%', accent: '220 20% 65%', 
+      bg: '220 15% 7%', cardBg: '220 15% 11%',
+      foreground: '220 10% 92%', mutedFg: '220 10% 55%', border: '220 15% 18%'
+    },
+    { 
+      id: 'warm-gray', name: '暖灰色', 
+      primary: '30 20% 55%', accent: '35 25% 60%', 
+      bg: '30 8% 7%', cardBg: '30 8% 11%',
+      foreground: '30 10% 92%', mutedFg: '30 8% 55%', border: '30 10% 18%'
+    },
+    { 
+      id: 'navy-blue', name: '藏青蓝', 
+      primary: '215 50% 45%', accent: '210 55% 55%', 
+      bg: '220 25% 7%', cardBg: '220 25% 11%',
+      foreground: '215 15% 92%', mutedFg: '215 12% 55%', border: '220 20% 18%'
+    },
+    { 
+      id: 'forest-green', name: '森林绿', 
+      primary: '140 35% 40%', accent: '135 40% 50%', 
+      bg: '145 20% 5%', cardBg: '145 18% 9%',
+      foreground: '140 15% 92%', mutedFg: '140 12% 55%', border: '145 18% 16%'
+    },
   ],
 };
 
-function applyTheme(theme: typeof THEMES.young[0]) {
+function applyTheme(theme: ThemeConfig) {
   const root = document.documentElement;
   root.style.setProperty('--primary', theme.primary);
+  root.style.setProperty('--primary-foreground', '0 0% 100%');
   root.style.setProperty('--accent', theme.accent);
+  root.style.setProperty('--accent-foreground', theme.foreground);
   root.style.setProperty('--background', theme.bg);
-  root.style.setProperty('--card', theme.bg);
-  root.style.setProperty('--popover', theme.bg);
+  root.style.setProperty('--foreground', theme.foreground);
+  root.style.setProperty('--card', theme.cardBg);
+  root.style.setProperty('--card-foreground', theme.foreground);
+  root.style.setProperty('--popover', theme.cardBg);
+  root.style.setProperty('--popover-foreground', theme.foreground);
+  root.style.setProperty('--muted', theme.cardBg);
+  root.style.setProperty('--muted-foreground', theme.mutedFg);
+  root.style.setProperty('--border', theme.border);
+  root.style.setProperty('--input', theme.border);
   localStorage.setItem('selected-theme', theme.id);
 }
 
@@ -34,21 +95,21 @@ export function ThemeSwitcher() {
     return saved || 'neon-purple';
   });
 
-  const handleSelectTheme = (theme: typeof THEMES.young[0]) => {
+  const handleSelectTheme = (theme: ThemeConfig) => {
     applyTheme(theme);
     setCurrentTheme(theme.id);
     setIsOpen(false);
   };
 
   // Apply saved theme on mount
-  useState(() => {
+  useEffect(() => {
     const saved = localStorage.getItem('selected-theme');
     if (saved) {
       const allThemes = [...THEMES.young, ...THEMES.middleAge];
       const theme = allThemes.find(t => t.id === saved);
       if (theme) applyTheme(theme);
     }
-  });
+  }, []);
 
   return (
     <div className="relative">
