@@ -1,10 +1,11 @@
 import { Kline, MarketSnapshot, TimeFrame } from '@/types/trading';
 
-// API endpoints (fallback for direct OKX calls which support CORS)
+// API endpoints
 const OKX_BASE_URL = 'https://www.okx.com/api/v5';
+const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
 
 // Data source type
-export type DataSource = 'OKX' | 'MEXC' | 'Gate' | 'Binance';
+export type DataSource = 'OKX' | 'Binance' | 'MEXC' | 'Gate';
 
 // Extended market snapshot with data source
 export interface MarketSnapshotWithSource extends MarketSnapshot {
@@ -299,8 +300,61 @@ async function fetchMarketSnapshotFromGate(symbol: string): Promise<MarketSnapsh
   };
 }
 
-// ============= Unified API with fallback (OKX -> MEXC -> Gate.io) =============
-// Note: Binance is removed due to geo-restrictions on the edge function server
+// ============= Binance API (Direct - supports CORS) =============
+async function fetchKlinesFromBinance(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number
+): Promise<Kline[]> {
+  const response = await fetch(
+    `${BINANCE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Binance API request failed');
+  }
+  
+  const data = await response.json();
+  
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('Binance data error or no data');
+  }
+  
+  return data.map((k: any[]) => ({
+    time: k[0] / 1000,
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
+}
+
+async function fetchMarketSnapshotFromBinance(symbol: string): Promise<MarketSnapshot> {
+  const [tickerResponse, priceResponse] = await Promise.all([
+    fetch(`${BINANCE_BASE_URL}/ticker/24hr?symbol=${symbol}`),
+    fetch(`${BINANCE_BASE_URL}/ticker/price?symbol=${symbol}`),
+  ]);
+  
+  if (!tickerResponse.ok || !priceResponse.ok) {
+    throw new Error('Binance API request failed');
+  }
+  
+  const ticker = await tickerResponse.json();
+  const price = await priceResponse.json();
+  
+  return {
+    symbol,
+    price: parseFloat(price.price),
+    change24h: parseFloat(ticker.priceChange),
+    changePercent24h: parseFloat(ticker.priceChangePercent),
+    high24h: parseFloat(ticker.highPrice),
+    low24h: parseFloat(ticker.lowPrice),
+    volume24h: parseFloat(ticker.volume),
+  };
+}
+
+// ============= Unified API with fallback (OKX -> Binance -> MEXC -> Gate.io) =============
 export async function fetchKlines(
   symbol: string,
   interval: TimeFrame,
@@ -310,10 +364,17 @@ export async function fetchKlines(
   try {
     return await fetchKlinesFromOkx(symbol, interval, limit);
   } catch (okxError) {
-    console.log('OKX failed, trying MEXC...', okxError);
+    console.log('OKX failed, trying Binance...', okxError);
   }
   
-  // Try MEXC second via proxy (good for meme coins)
+  // Try Binance second (supports CORS directly)
+  try {
+    return await fetchKlinesFromBinance(symbol, interval, limit);
+  } catch (binanceError) {
+    console.log('Binance failed, trying MEXC...', binanceError);
+  }
+  
+  // Try MEXC third via proxy (good for meme coins)
   try {
     return await fetchKlinesFromMexc(symbol, interval, limit);
   } catch (mexcError) {
@@ -325,7 +386,7 @@ export async function fetchKlines(
     return await fetchKlinesFromGate(symbol, interval, limit);
   } catch (gateError) {
     console.error('All APIs failed:', gateError);
-    throw new Error('无法获取K线数据，请检查交易对是否正确（已尝试OKX/MEXC/Gate.io）');
+    throw new Error('无法获取K线数据，请检查交易对是否正确（已尝试OKX/Binance/MEXC/Gate.io）');
   }
 }
 
@@ -335,10 +396,18 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     const data = await fetchMarketSnapshotFromOkx(symbol);
     return { ...data, dataSource: 'OKX' };
   } catch (okxError) {
-    console.log('OKX failed, trying MEXC...', okxError);
+    console.log('OKX failed, trying Binance...', okxError);
   }
   
-  // Try MEXC second via proxy (good for meme coins)
+  // Try Binance second (supports CORS directly)
+  try {
+    const data = await fetchMarketSnapshotFromBinance(symbol);
+    return { ...data, dataSource: 'Binance' };
+  } catch (binanceError) {
+    console.log('Binance failed, trying MEXC...', binanceError);
+  }
+  
+  // Try MEXC third via proxy (good for meme coins)
   try {
     const data = await fetchMarketSnapshotFromMexc(symbol);
     return { ...data, dataSource: 'MEXC' };
@@ -352,7 +421,7 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     return { ...data, dataSource: 'Gate' };
   } catch (gateError) {
     console.error('All APIs failed:', gateError);
-    throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/MEXC/Gate.io）');
+    throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/Binance/MEXC/Gate.io）');
   }
 }
 
@@ -365,6 +434,7 @@ const POPULAR_SYMBOLS = [
 
 // Caches
 let okxSymbolsCache: string[] = [];
+let binanceSymbolsCache: string[] = [];
 let gateSymbolsCache: string[] = [];
 let mexcSymbolsCache: string[] = [];
 let cacheTime: number = 0;
@@ -442,21 +512,40 @@ async function fetchGateSymbols(): Promise<string[]> {
   }
 }
 
+async function fetchBinanceSymbols(): Promise<string[]> {
+  try {
+    const response = await fetch(`${BINANCE_BASE_URL}/exchangeInfo`);
+    if (!response.ok) throw new Error('Failed to fetch Binance symbols');
+    
+    const data = await response.json();
+    return data.symbols
+      .filter((s: any) => s.status === 'TRADING' && s.quoteAsset === 'USDT')
+      .map((s: any) => s.symbol);
+  } catch (error) {
+    console.log('Binance symbols fetch failed:', error);
+    return [];
+  }
+}
+
 async function fetchAllSymbols(): Promise<string[]> {
   // Return cache if valid
   if (okxSymbolsCache.length > 0 && Date.now() - cacheTime < CACHE_DURATION) {
-    return [...new Set([...okxSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache])];
+    return [...new Set([...okxSymbolsCache, ...binanceSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache])];
   }
 
-  // Fetch from OKX, MEXC, Gate.io in parallel (Binance removed due to geo-restrictions)
-  const [okxResult, mexcResult, gateResult] = await Promise.allSettled([
+  // Fetch from all exchanges in parallel
+  const [okxResult, binanceResult, mexcResult, gateResult] = await Promise.allSettled([
     fetchOkxSymbols(),
+    fetchBinanceSymbols(),
     fetchMexcSymbols(),
     fetchGateSymbols(),
   ]);
 
   if (okxResult.status === 'fulfilled') {
     okxSymbolsCache = okxResult.value;
+  }
+  if (binanceResult.status === 'fulfilled') {
+    binanceSymbolsCache = binanceResult.value;
   }
   if (mexcResult.status === 'fulfilled') {
     mexcSymbolsCache = mexcResult.value;
@@ -468,7 +557,7 @@ async function fetchAllSymbols(): Promise<string[]> {
   cacheTime = Date.now();
 
   // Merge and dedupe
-  const allSymbols = [...new Set([...okxSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache])];
+  const allSymbols = [...new Set([...okxSymbolsCache, ...binanceSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache])];
   
   // Sort with popular symbols first
   return allSymbols.sort((a, b) => {
