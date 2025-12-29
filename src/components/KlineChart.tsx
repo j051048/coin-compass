@@ -80,10 +80,9 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
   const maSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const bbSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
 
-  // Calculate active sub-charts count for height distribution
-  const subChartCount = [showVOL, showMACD, showRSI, showKDJ, showWR].filter(Boolean).length;
-  const mainChartHeight = subChartCount > 0 ? 320 : 400;
-  const subChartHeight = subChartCount > 0 ? Math.floor(180 / subChartCount) : 0;
+  // Fixed heights - no compression, use scrolling instead
+  const mainChartHeight = 350;
+  const subChartHeight = 100; // Fixed height for each sub-chart
 
   useEffect(() => {
     if (!mainContainerRef.current) return;
@@ -484,38 +483,40 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
   }, [klines, showMA, showVOL, showBB, showMACD, showRSI, showKDJ, showWR]);
 
   return (
-    <div ref={containerRef} className="chart-container w-full h-full min-h-[400px] flex flex-col">
-      <div ref={mainContainerRef} className="w-full flex-1" style={{ minHeight: mainChartHeight }} />
-      {showVOL && (
-        <div className="border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground px-2 py-1">VOL</div>
-          <div ref={volContainerRef} className="w-full" style={{ height: subChartHeight }} />
-        </div>
-      )}
-      {showMACD && (
-        <div className="border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground px-2 py-1">MACD</div>
-          <div ref={macdContainerRef} className="w-full" style={{ height: subChartHeight }} />
-        </div>
-      )}
-      {showRSI && (
-        <div className="border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground px-2 py-1">RSI (14)</div>
-          <div ref={rsiContainerRef} className="w-full" style={{ height: subChartHeight }} />
-        </div>
-      )}
-      {showKDJ && (
-        <div className="border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground px-2 py-1">KDJ</div>
-          <div ref={kdjContainerRef} className="w-full" style={{ height: subChartHeight }} />
-        </div>
-      )}
-      {showWR && (
-        <div className="border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground px-2 py-1">W%R (14)</div>
-          <div ref={wrContainerRef} className="w-full" style={{ height: subChartHeight }} />
-        </div>
-      )}
+    <div ref={containerRef} className="chart-container w-full h-full overflow-y-auto scrollbar-custom">
+      <div className="min-h-full">
+        <div ref={mainContainerRef} className="w-full" style={{ height: mainChartHeight }} />
+        {showVOL && (
+          <div className="border-t border-border/50">
+            <div className="text-[10px] text-muted-foreground px-2 py-1">VOL</div>
+            <div ref={volContainerRef} className="w-full" style={{ height: subChartHeight }} />
+          </div>
+        )}
+        {showMACD && (
+          <div className="border-t border-border/50">
+            <div className="text-[10px] text-muted-foreground px-2 py-1">MACD</div>
+            <div ref={macdContainerRef} className="w-full" style={{ height: subChartHeight }} />
+          </div>
+        )}
+        {showRSI && (
+          <div className="border-t border-border/50">
+            <div className="text-[10px] text-muted-foreground px-2 py-1">RSI (14)</div>
+            <div ref={rsiContainerRef} className="w-full" style={{ height: subChartHeight }} />
+          </div>
+        )}
+        {showKDJ && (
+          <div className="border-t border-border/50">
+            <div className="text-[10px] text-muted-foreground px-2 py-1">KDJ</div>
+            <div ref={kdjContainerRef} className="w-full" style={{ height: subChartHeight }} />
+          </div>
+        )}
+        {showWR && (
+          <div className="border-t border-border/50">
+            <div className="text-[10px] text-muted-foreground px-2 py-1">W%R (14)</div>
+            <div ref={wrContainerRef} className="w-full" style={{ height: subChartHeight }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
