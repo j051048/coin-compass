@@ -4,9 +4,10 @@ import { Kline, MarketSnapshot, TimeFrame } from '@/types/trading';
 const OKX_BASE_URL = 'https://www.okx.com/api/v5';
 const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
 const GATE_BASE_URL = 'https://api.gateio.ws/api/v4';
+const MEXC_BASE_URL = 'https://api.mexc.com/api/v3';
 
 // Data source type
-export type DataSource = 'OKX' | 'Gate' | 'Binance';
+export type DataSource = 'OKX' | 'MEXC' | 'Gate' | 'Binance';
 
 // Extended market snapshot with data source
 export interface MarketSnapshotWithSource extends MarketSnapshot {
@@ -59,6 +60,20 @@ function toGateInterval(interval: TimeFrame): string {
     '4h': '4h',
     '1d': '1d',
     '1w': '7d',
+  };
+  return map[interval] || '1h';
+}
+
+// Convert timeframe format for MEXC
+function toMexcInterval(interval: TimeFrame): string {
+  const map: Record<TimeFrame, string> = {
+    '1m': '1m',
+    '5m': '5m',
+    '15m': '15m',
+    '1h': '1h',
+    '4h': '4h',
+    '1d': '1d',
+    '1w': '1w',
   };
   return map[interval] || '1h';
 }
@@ -203,6 +218,63 @@ async function fetchMarketSnapshotFromGate(symbol: string): Promise<MarketSnapsh
   };
 }
 
+// ============= MEXC API =============
+async function fetchKlinesFromMexc(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number
+): Promise<Kline[]> {
+  const mexcInterval = toMexcInterval(interval);
+  
+  const response = await fetch(
+    `${MEXC_BASE_URL}/klines?symbol=${symbol}&interval=${mexcInterval}&limit=${limit}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('MEXC API request failed');
+  }
+  
+  const data = await response.json();
+  
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('MEXC data error or no data');
+  }
+  
+  // MEXC returns same format as Binance: [openTime, open, high, low, close, volume, ...]
+  return data.map((k: any[]) => ({
+    time: k[0] / 1000,
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
+}
+
+async function fetchMarketSnapshotFromMexc(symbol: string): Promise<MarketSnapshot> {
+  const response = await fetch(`${MEXC_BASE_URL}/ticker/24hr?symbol=${symbol}`);
+  
+  if (!response.ok) {
+    throw new Error('MEXC API request failed');
+  }
+  
+  const ticker = await response.json();
+  
+  if (!ticker || ticker.code) {
+    throw new Error(ticker?.msg || 'MEXC data error');
+  }
+  
+  return {
+    symbol,
+    price: parseFloat(ticker.lastPrice),
+    change24h: parseFloat(ticker.priceChange),
+    changePercent24h: parseFloat(ticker.priceChangePercent),
+    high24h: parseFloat(ticker.highPrice),
+    low24h: parseFloat(ticker.lowPrice),
+    volume24h: parseFloat(ticker.volume),
+  };
+}
+
 // ============= Binance API =============
 async function fetchKlinesFromBinance(
   symbol: string,
@@ -253,7 +325,7 @@ async function fetchMarketSnapshotFromBinance(symbol: string): Promise<MarketSna
   };
 }
 
-// ============= Unified API with fallback (OKX -> Gate.io -> Binance) =============
+// ============= Unified API with fallback (OKX -> MEXC -> Gate.io -> Binance) =============
 export async function fetchKlines(
   symbol: string,
   interval: TimeFrame,
@@ -263,10 +335,17 @@ export async function fetchKlines(
   try {
     return await fetchKlinesFromOkx(symbol, interval, limit);
   } catch (okxError) {
-    console.log('OKX failed, trying Gate.io...', okxError);
+    console.log('OKX failed, trying MEXC...', okxError);
   }
   
-  // Try Gate.io second (good for meme coins)
+  // Try MEXC second (good for meme coins, no CORS issues)
+  try {
+    return await fetchKlinesFromMexc(symbol, interval, limit);
+  } catch (mexcError) {
+    console.log('MEXC failed, trying Gate.io...', mexcError);
+  }
+  
+  // Try Gate.io third
   try {
     return await fetchKlinesFromGate(symbol, interval, limit);
   } catch (gateError) {
@@ -278,7 +357,7 @@ export async function fetchKlines(
     return await fetchKlinesFromBinance(symbol, interval, limit);
   } catch (binanceError) {
     console.error('All APIs failed:', binanceError);
-    throw new Error('无法获取K线数据，请检查交易对是否正确（已尝试OKX/Gate.io/Binance）');
+    throw new Error('无法获取K线数据，请检查交易对是否正确（已尝试OKX/MEXC/Gate.io/Binance）');
   }
 }
 
@@ -288,10 +367,18 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     const data = await fetchMarketSnapshotFromOkx(symbol);
     return { ...data, dataSource: 'OKX' };
   } catch (okxError) {
-    console.log('OKX failed, trying Gate.io...', okxError);
+    console.log('OKX failed, trying MEXC...', okxError);
   }
   
-  // Try Gate.io second (good for meme coins)
+  // Try MEXC second (good for meme coins, no CORS issues)
+  try {
+    const data = await fetchMarketSnapshotFromMexc(symbol);
+    return { ...data, dataSource: 'MEXC' };
+  } catch (mexcError) {
+    console.log('MEXC failed, trying Gate.io...', mexcError);
+  }
+  
+  // Try Gate.io third
   try {
     const data = await fetchMarketSnapshotFromGate(symbol);
     return { ...data, dataSource: 'Gate' };
@@ -305,7 +392,7 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     return { ...data, dataSource: 'Binance' };
   } catch (binanceError) {
     console.error('All APIs failed:', binanceError);
-    throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/Gate.io/Binance）');
+    throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/MEXC/Gate.io/Binance）');
   }
 }
 
@@ -320,6 +407,7 @@ const POPULAR_SYMBOLS = [
 let okxSymbolsCache: string[] = [];
 let binanceSymbolsCache: string[] = [];
 let gateSymbolsCache: string[] = [];
+let mexcSymbolsCache: string[] = [];
 let cacheTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -347,7 +435,6 @@ async function fetchBinanceSymbols(): Promise<string[]> {
 
 async function fetchGateSymbols(): Promise<string[]> {
   // Gate.io API has CORS restrictions, so we maintain a curated list of popular meme coins
-  // that are available on Gate.io but not on other exchanges
   const GATE_MEME_COINS = [
     'PIPPINUSDT', 'GOATUSDT', 'ACTUSDT', 'PNUTUSDT', 'NEIROUSDT',
     'MOGUSDT', 'SPXUSDT', 'GLOWYUSDT', 'TOSHIUSDT', 'BRETTUSDT',
@@ -357,21 +444,40 @@ async function fetchGateSymbols(): Promise<string[]> {
   return GATE_MEME_COINS;
 }
 
+async function fetchMexcSymbols(): Promise<string[]> {
+  try {
+    const response = await fetch(`${MEXC_BASE_URL}/exchangeInfo`);
+    if (!response.ok) throw new Error('Failed to fetch MEXC symbols');
+    
+    const data = await response.json();
+    return data.symbols
+      .filter((s: any) => s.status === 'ENABLED' && s.quoteAsset === 'USDT')
+      .map((s: any) => s.symbol);
+  } catch (error) {
+    console.log('MEXC symbols fetch failed:', error);
+    return [];
+  }
+}
+
 async function fetchAllSymbols(): Promise<string[]> {
   // Return cache if valid
   if (okxSymbolsCache.length > 0 && Date.now() - cacheTime < CACHE_DURATION) {
-    return [...new Set([...okxSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
+    return [...new Set([...okxSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
   }
 
   // Fetch from all exchanges in parallel
-  const [okxResult, gateResult, binanceResult] = await Promise.allSettled([
+  const [okxResult, mexcResult, gateResult, binanceResult] = await Promise.allSettled([
     fetchOkxSymbols(),
+    fetchMexcSymbols(),
     fetchGateSymbols(),
     fetchBinanceSymbols(),
   ]);
 
   if (okxResult.status === 'fulfilled') {
     okxSymbolsCache = okxResult.value;
+  }
+  if (mexcResult.status === 'fulfilled') {
+    mexcSymbolsCache = mexcResult.value;
   }
   if (gateResult.status === 'fulfilled') {
     gateSymbolsCache = gateResult.value;
@@ -383,7 +489,7 @@ async function fetchAllSymbols(): Promise<string[]> {
   cacheTime = Date.now();
 
   // Merge and dedupe
-  const allSymbols = [...new Set([...okxSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
+  const allSymbols = [...new Set([...okxSymbolsCache, ...mexcSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
   
   // Sort with popular symbols first
   return allSymbols.sort((a, b) => {
