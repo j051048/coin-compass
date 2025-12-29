@@ -15,6 +15,38 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
+// Helper functions for localStorage
+const getAnalysisKey = (symbol: string, timeframe: string) => `analysis_${symbol}_${timeframe}`;
+
+const saveAnalysis = (symbol: string, timeframe: string, analysis: TechnicalAnalysis) => {
+  try {
+    const key = getAnalysisKey(symbol, timeframe);
+    const data = {
+      analysis,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Failed to save analysis to localStorage:', e);
+  }
+};
+
+const loadAnalysis = (symbol: string, timeframe: string): TechnicalAnalysis | null => {
+  try {
+    const key = getAnalysisKey(symbol, timeframe);
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+    
+    const data = JSON.parse(stored);
+    // Check if data is less than 24 hours old
+    const isValid = Date.now() - data.timestamp < 24 * 60 * 60 * 1000;
+    return isValid ? data.analysis : null;
+  } catch (e) {
+    console.warn('Failed to load analysis from localStorage:', e);
+    return null;
+  }
+};
+
 const Index = () => {
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState<TimeFrame>('4h');
@@ -43,7 +75,10 @@ const Index = () => {
       setKlines(klinesData);
       setSnapshot(snapshotData);
       setIndicators(calculateIndicators(klinesData));
-      setAnalysis(null); // Clear previous analysis when data changes
+      
+      // Load cached analysis for this symbol/timeframe
+      const cachedAnalysis = loadAnalysis(symbol, timeframe);
+      setAnalysis(cachedAnalysis);
     } catch (error) {
       toast({
         title: '数据加载失败',
@@ -122,9 +157,10 @@ const Index = () => {
       
       if (parsedAnalysis) {
         setAnalysis(parsedAnalysis);
+        saveAnalysis(symbol, timeframe, parsedAnalysis);
         toast({
           title: 'AI分析完成',
-          description: '技术分析报告已生成',
+          description: '技术分析报告已生成并缓存',
         });
       } else {
         // Fallback to mock analysis if parsing fails
@@ -172,6 +208,7 @@ const Index = () => {
           }
         };
         setAnalysis(mockAnalysis);
+        saveAnalysis(symbol, timeframe, mockAnalysis);
         toast({
           title: 'AI分析完成',
           description: '使用本地计算结果（AI响应解析失败）',
