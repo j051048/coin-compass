@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Zap, Eye, EyeOff, RefreshCw, BarChart3 } from 'lucide-react';
+import { Zap, Eye, EyeOff, RefreshCw, BarChart3, Lock } from 'lucide-react';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { Kline, MarketSnapshot, TimeFrame, IndicatorValues, TechnicalAnalysis } from '@/types/trading';
 import { fetchKlines, fetchMarketSnapshot } from '@/lib/binanceApi';
 import { calculateIndicators } from '@/lib/indicators';
@@ -13,8 +14,10 @@ import { AnalysisReport } from '@/components/AnalysisReport';
 import { ApiConfigDialog, getApiConfig } from '@/components/ApiConfigDialog';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { WalletButton } from '@/components/WalletButton';
+import { PaymentPanel } from '@/components/PaymentPanel';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { usePaymentGate } from '@/hooks/usePaymentGate';
 
 // Helper functions for localStorage - cache by symbol only (not timeframe)
 const getAnalysisKey = (symbol: string) => `analysis_${symbol}`;
@@ -67,6 +70,19 @@ const Index = () => {
   const [showKDJ, setShowKDJ] = useState(false);
   const [showWR, setShowWR] = useState(false);
   const { toast } = useToast();
+  
+  // Payment gate hook
+  const {
+    canUse,
+    needsPayment,
+    remainingUses,
+    isPaying,
+    isConnected,
+    consumeUse,
+    payWithToken,
+  } = usePaymentGate();
+  
+  const { openConnectModal } = useConnectModal();
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -105,6 +121,15 @@ const Index = () => {
   }, [loadData]);
 
   const handleAnalyze = async () => {
+    if (!canUse) {
+      toast({
+        title: '使用次数已用完',
+        description: '请付费解锁更多次数',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!klines.length || !indicators) {
       toast({
         title: '数据不足',
@@ -125,6 +150,9 @@ const Index = () => {
       return;
     }
 
+    // Consume one use before starting analysis
+    consumeUse();
+    
     setIsAnalyzing(true);
     
     try {
@@ -354,14 +382,35 @@ const Index = () => {
             </div>
 
             {/* Analysis Button */}
-            <Button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || isLoading}
-              className="w-full py-6 text-lg font-semibold"
-            >
-              <Zap className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-              {isAnalyzing ? '分析中...' : '生成AI技术分析'}
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || isLoading || !canUse}
+                className={`w-full py-6 text-lg font-semibold ${!canUse ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {!canUse ? (
+                  <>
+                    <Lock className="w-5 h-5 mr-2" />
+                    使用次数已用完
+                  </>
+                ) : (
+                  <>
+                    <Zap className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                    {isAnalyzing ? '分析中...' : `生成AI技术分析 (剩余${remainingUses}次)`}
+                  </>
+                )}
+              </Button>
+              
+              {/* Payment Panel - show when needs payment */}
+              {needsPayment && (
+                <PaymentPanel
+                  isPaying={isPaying}
+                  isConnected={isConnected}
+                  onPay={payWithToken}
+                  onConnect={() => openConnectModal?.()}
+                />
+              )}
+            </div>
           </div>
 
           {/* Right Panel - Indicators & Analysis */}
