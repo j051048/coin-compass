@@ -3,6 +3,19 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, LineData } from 'l
 import { Kline } from '@/types/trading';
 import { getIndicatorSeries } from '@/lib/indicators';
 
+// Colors in hex format (lightweight-charts doesn't support HSL)
+const COLORS = {
+  bull: '#22c55e',      // green
+  bear: '#ef4444',      // red
+  grid: '#1e293b',      // slate
+  text: '#64748b',      // muted
+  accent: '#eab308',    // yellow/gold
+  border: '#334155',
+  ma7: '#0ea5e9',       // sky blue
+  ma21: '#a855f7',      // purple
+  ma50: '#eab308',      // yellow
+};
+
 interface KlineChartProps {
   klines: Kline[];
   showMA: boolean;
@@ -22,31 +35,31 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
     const chart = createChart(containerRef.current, {
       layout: {
         background: { color: 'transparent' },
-        textColor: 'hsl(215, 20%, 55%)',
+        textColor: COLORS.text,
         fontFamily: 'JetBrains Mono, monospace',
       },
       grid: {
-        vertLines: { color: 'hsl(222, 30%, 15%)' },
-        horzLines: { color: 'hsl(222, 30%, 15%)' },
+        vertLines: { color: COLORS.grid },
+        horzLines: { color: COLORS.grid },
       },
       crosshair: {
         mode: 1,
         vertLine: {
-          color: 'hsl(45, 93%, 58%)',
+          color: COLORS.accent,
           width: 1,
           style: 2,
         },
         horzLine: {
-          color: 'hsl(45, 93%, 58%)',
+          color: COLORS.accent,
           width: 1,
           style: 2,
         },
       },
       rightPriceScale: {
-        borderColor: 'hsl(222, 30%, 18%)',
+        borderColor: COLORS.border,
       },
       timeScale: {
-        borderColor: 'hsl(222, 30%, 18%)',
+        borderColor: COLORS.border,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -59,12 +72,12 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
     });
 
     const candleSeries = chart.addCandlestickSeries({
-      upColor: 'hsl(142, 76%, 45%)',
-      downColor: 'hsl(0, 72%, 51%)',
-      borderUpColor: 'hsl(142, 76%, 45%)',
-      borderDownColor: 'hsl(0, 72%, 51%)',
-      wickUpColor: 'hsl(142, 76%, 45%)',
-      wickDownColor: 'hsl(0, 72%, 51%)',
+      upColor: COLORS.bull,
+      downColor: COLORS.bear,
+      borderUpColor: COLORS.bull,
+      borderDownColor: COLORS.bear,
+      wickUpColor: COLORS.bull,
+      wickDownColor: COLORS.bear,
     });
 
     chartRef.current = chart;
@@ -111,9 +124,9 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
 
     if (showMA) {
       const maConfigs = [
-        { data: indicators.ma7, color: 'hsl(199, 89%, 48%)', title: 'MA7' },
-        { data: indicators.ma21, color: 'hsl(280, 87%, 65%)', title: 'MA21' },
-        { data: indicators.ma50, color: 'hsl(45, 93%, 58%)', title: 'MA50' },
+        { data: indicators.ma7, color: COLORS.ma7, title: 'MA7' },
+        { data: indicators.ma21, color: COLORS.ma21, title: 'MA21' },
+        { data: indicators.ma50, color: COLORS.ma50, title: 'MA50' },
       ];
 
       maConfigs.forEach(({ data, color, title }) => {
@@ -139,9 +152,9 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
 
     if (showBB) {
       const bbConfigs = [
-        { key: 'upper' as const, color: 'hsl(280, 87%, 65%)', title: 'BB上轨' },
-        { key: 'middle' as const, color: 'hsl(45, 93%, 58%)', title: 'BB中轨' },
-        { key: 'lower' as const, color: 'hsl(280, 87%, 65%)', title: 'BB下轨' },
+        { key: 'upper' as const, color: COLORS.ma21, title: 'BB上轨' },
+        { key: 'middle' as const, color: COLORS.ma50, title: 'BB中轨' },
+        { key: 'lower' as const, color: COLORS.ma21, title: 'BB下轨' },
       ];
 
       bbConfigs.forEach(({ key, color, title }) => {
