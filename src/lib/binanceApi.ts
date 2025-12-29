@@ -99,21 +99,75 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
   };
 }
 
-// Popular trading pairs (OKX format internally converted)
+// Popular trading pairs for quick access
 const POPULAR_SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
   'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
-  'LINKUSDT', 'ATOMUSDT', 'LTCUSDT', 'UNIUSDT', 'APTUSDT',
-  'ARBUSDT', 'OPUSDT', 'SUIUSDT', 'PEPEUSDT', 'WIFUSDT',
 ];
 
-export async function searchSymbols(query: string): Promise<string[]> {
-  // Return filtered popular symbols (no need for API call)
-  if (!query) {
-    return POPULAR_SYMBOLS.slice(0, 20);
+// Cache for symbols list
+let symbolsCache: string[] | null = null;
+let cacheTime: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+async function fetchAllSymbols(): Promise<string[]> {
+  // Return cache if valid
+  if (symbolsCache && Date.now() - cacheTime < CACHE_DURATION) {
+    return symbolsCache;
   }
+
+  const response = await fetch(
+    `${OKX_BASE_URL}/public/instruments?instType=SPOT`
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch symbols');
+  }
+
+  const result = await response.json();
+
+  if (result.code !== '0' || !result.data) {
+    throw new Error(result.msg || 'Failed to fetch symbols');
+  }
+
+  // Convert OKX format (BTC-USDT) to standard format (BTCUSDT)
+  // Filter only USDT pairs for simplicity
+  symbolsCache = result.data
+    .filter((s: any) => s.quoteCcy === 'USDT' && s.state === 'live')
+    .map((s: any) => s.instId.replace('-', ''))
+    .sort((a: string, b: string) => {
+      // Sort popular symbols first
+      const aPopular = POPULAR_SYMBOLS.indexOf(a);
+      const bPopular = POPULAR_SYMBOLS.indexOf(b);
+      if (aPopular !== -1 && bPopular !== -1) return aPopular - bPopular;
+      if (aPopular !== -1) return -1;
+      if (bPopular !== -1) return 1;
+      return a.localeCompare(b);
+    });
   
-  return POPULAR_SYMBOLS
-    .filter((s: string) => s.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 20);
+  cacheTime = Date.now();
+  return symbolsCache;
+}
+
+export async function searchSymbols(query: string): Promise<string[]> {
+  try {
+    const allSymbols = await fetchAllSymbols();
+    
+    if (!query) {
+      return allSymbols.slice(0, 20);
+    }
+    
+    return allSymbols
+      .filter((s: string) => s.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 20);
+  } catch (error) {
+    // Fallback to popular symbols if API fails
+    console.error('Failed to fetch symbols:', error);
+    if (!query) {
+      return POPULAR_SYMBOLS;
+    }
+    return POPULAR_SYMBOLS.filter((s: string) => 
+      s.toLowerCase().includes(query.toLowerCase())
+    );
+  }
 }
