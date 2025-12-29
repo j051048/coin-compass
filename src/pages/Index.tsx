@@ -267,7 +267,7 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Panel - Chart & Controls */}
           <div className="lg:col-span-8 space-y-4">
-            <MarketHeader snapshot={snapshot} isLoading={isLoading} />
+            <MarketHeader snapshot={snapshot} isLoading={isLoading} symbol={symbol} />
             
             {/* Chart Controls */}
             <div className="flex items-center gap-2 flex-wrap">
