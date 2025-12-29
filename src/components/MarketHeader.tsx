@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { MarketSnapshot } from '@/types/trading';
-import { TrendingUp, TrendingDown, Activity, Info } from 'lucide-react';
+import { DataSource } from '@/lib/binanceApi';
+import { TrendingUp, TrendingDown, Activity, Info, Search, Loader2 } from 'lucide-react';
 
 interface MarketHeaderProps {
-  snapshot: MarketSnapshot | null;
+  snapshot: (MarketSnapshot & { dataSource?: DataSource }) | null;
   isLoading: boolean;
   symbol?: string;
 }
@@ -113,15 +115,117 @@ const COIN_INFO: Record<string, { name: string; description: string }> = {
     name: 'Aave',
     description: 'Aave是一个去中心化借贷协议，允许用户存款赚取利息或借入加密资产。是DeFi领域的领先协议之一。'
   },
+  FLOW: {
+    name: 'Flow',
+    description: 'Flow是专为NFT和游戏设计的区块链，由Dapper Labs创建。NBA Top Shot等知名项目基于Flow构建。'
+  },
+  FLOKI: {
+    name: 'Floki',
+    description: 'Floki是以埃隆·马斯克的柴犬命名的模因币，结合了模因文化和实用性，致力于构建元宇宙和DeFi生态。'
+  },
+  BONK: {
+    name: 'Bonk',
+    description: 'Bonk是Solana生态的社区驱动模因币，作为"人民的狗币"，旨在重振Solana社区的信心和活力。'
+  },
+  WIF: {
+    name: 'Dogwifhat',
+    description: 'WIF是Solana上的模因币，以戴帽子的柴犬为主题。凭借其独特的社区文化快速走红。'
+  },
+  PIPPIN: {
+    name: 'Pippin',
+    description: 'Pippin是一个社区驱动的模因代币，以可爱的角色形象闻名，在社交媒体上拥有活跃的粉丝群体。'
+  },
 };
+
+// 代币信息缓存
+const tokenInfoCache: Record<string, { name: string; description: string; timestamp: number }> = {};
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 const getSymbolBase = (symbol: string): string => {
   return symbol.replace(/USDT$|BUSD$|USDC$|BTC$|ETH$/i, '').toUpperCase();
 };
 
+// 从网上搜索代币信息的函数
+async function searchTokenInfo(symbol: string): Promise<{ name: string; description: string } | null> {
+  // Check cache first
+  const cached = tokenInfoCache[symbol];
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return { name: cached.name, description: cached.description };
+  }
+
+  try {
+    // Use CoinGecko API to get token info (free, no API key needed)
+    const searchResponse = await fetch(
+      `https://api.coingecko.com/api/v3/search?query=${symbol}`
+    );
+    
+    if (!searchResponse.ok) return null;
+    
+    const searchData = await searchResponse.json();
+    const coin = searchData.coins?.[0];
+    
+    if (!coin) return null;
+
+    // Get more details from coin info
+    const detailResponse = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`
+    );
+    
+    if (!detailResponse.ok) {
+      // Fallback to basic info
+      const result = {
+        name: coin.name,
+        description: `${coin.name}是一个加密货币项目。市值排名#${coin.market_cap_rank || 'N/A'}。`
+      };
+      tokenInfoCache[symbol] = { ...result, timestamp: Date.now() };
+      return result;
+    }
+    
+    const detailData = await detailResponse.json();
+    
+    // Extract and shorten description
+    let description = detailData.description?.en || detailData.description?.zh || '';
+    // Remove HTML tags
+    description = description.replace(/<[^>]*>/g, '');
+    // Shorten to ~80 characters
+    if (description.length > 80) {
+      description = description.substring(0, 77) + '...';
+    }
+    
+    if (!description) {
+      description = `${coin.name}是一个加密货币项目${detailData.categories?.length ? '，类别：' + detailData.categories.slice(0, 2).join('、') : ''}。`;
+    }
+    
+    const result = { name: coin.name, description };
+    tokenInfoCache[symbol] = { ...result, timestamp: Date.now() };
+    return result;
+  } catch (error) {
+    console.error('Failed to fetch token info:', error);
+    return null;
+  }
+}
+
 export function MarketHeader({ snapshot, isLoading, symbol = 'BTCUSDT' }: MarketHeaderProps) {
   const baseSymbol = getSymbolBase(symbol);
-  const coinInfo = COIN_INFO[baseSymbol];
+  const staticCoinInfo = COIN_INFO[baseSymbol];
+  
+  const [dynamicInfo, setDynamicInfo] = useState<{ name: string; description: string } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Auto-search for unknown tokens
+  useEffect(() => {
+    if (!staticCoinInfo && baseSymbol) {
+      setIsSearching(true);
+      searchTokenInfo(baseSymbol).then(info => {
+        setDynamicInfo(info);
+        setIsSearching(false);
+      });
+    } else {
+      setDynamicInfo(null);
+    }
+  }, [baseSymbol, staticCoinInfo]);
+
+  const coinInfo = staticCoinInfo || dynamicInfo;
 
   if (isLoading || !snapshot) {
     return (
@@ -147,6 +251,8 @@ export function MarketHeader({ snapshot, isLoading, symbol = 'BTCUSDT' }: Market
     if (vol >= 1e3) return `${(vol / 1e3).toFixed(2)}K`;
     return vol.toFixed(2);
   };
+
+  const dataSource = (snapshot as any).dataSource as DataSource | undefined;
 
   return (
     <div className="glass-panel p-4">
@@ -184,7 +290,20 @@ export function MarketHeader({ snapshot, isLoading, symbol = 'BTCUSDT' }: Market
           </div>
         )}
 
-        {!coinInfo && (
+        {!coinInfo && isSearching && (
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Loader2 className="w-4 h-4 text-primary flex-shrink-0 animate-spin" />
+              <span className="text-sm font-semibold text-foreground">{baseSymbol}</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed flex items-center gap-1">
+              <Search className="w-3 h-3" />
+              正在搜索代币信息...
+            </p>
+          </div>
+        )}
+
+        {!coinInfo && !isSearching && (
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <Info className="w-4 h-4 text-primary flex-shrink-0" />
@@ -197,7 +316,7 @@ export function MarketHeader({ snapshot, isLoading, symbol = 'BTCUSDT' }: Market
         )}
 
         <div className="live-indicator flex-shrink-0">
-          <span>实时</span>
+          <span>({dataSource || 'OKX'}) 实时</span>
         </div>
       </div>
 
