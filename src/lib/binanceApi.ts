@@ -3,6 +3,7 @@ import { Kline, MarketSnapshot, TimeFrame } from '@/types/trading';
 // API endpoints
 const OKX_BASE_URL = 'https://www.okx.com/api/v5';
 const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
+const GATE_BASE_URL = 'https://api.gateio.ws/api/v4';
 
 // Convert symbol format: BTCUSDT -> BTC-USDT
 function toOkxSymbol(symbol: string): string {
@@ -11,6 +12,17 @@ function toOkxSymbol(symbol: string): string {
   }
   if (symbol.endsWith('USD')) {
     return symbol.replace('USD', '-USD');
+  }
+  return symbol;
+}
+
+// Convert symbol format: BTCUSDT -> BTC_USDT (Gate.io format)
+function toGateSymbol(symbol: string): string {
+  if (symbol.endsWith('USDT')) {
+    return symbol.replace('USDT', '_USDT');
+  }
+  if (symbol.endsWith('USD')) {
+    return symbol.replace('USD', '_USD');
   }
   return symbol;
 }
@@ -27,6 +39,20 @@ function toOkxInterval(interval: TimeFrame): string {
     '1w': '1W',
   };
   return map[interval] || '1H';
+}
+
+// Convert timeframe format for Gate.io
+function toGateInterval(interval: TimeFrame): string {
+  const map: Record<TimeFrame, string> = {
+    '1m': '1m',
+    '5m': '5m',
+    '15m': '15m',
+    '1h': '1h',
+    '4h': '4h',
+    '1d': '1d',
+    '1w': '7d',
+  };
+  return map[interval] || '1h';
 }
 
 // ============= OKX API =============
@@ -48,7 +74,7 @@ async function fetchKlinesFromOkx(
   
   const result = await response.json();
   
-  if (result.code !== '0' || !result.data) {
+  if (result.code !== '0' || !result.data || result.data.length === 0) {
     throw new Error(result.msg || 'OKX data error');
   }
   
@@ -96,6 +122,76 @@ async function fetchMarketSnapshotFromOkx(symbol: string): Promise<MarketSnapsho
     high24h: parseFloat(ticker.high24h),
     low24h: parseFloat(ticker.low24h),
     volume24h: parseFloat(ticker.vol24h),
+  };
+}
+
+// ============= Gate.io API =============
+async function fetchKlinesFromGate(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number
+): Promise<Kline[]> {
+  const gateSymbol = toGateSymbol(symbol);
+  const gateInterval = toGateInterval(interval);
+  
+  const response = await fetch(
+    `${GATE_BASE_URL}/spot/candlesticks?currency_pair=${gateSymbol}&interval=${gateInterval}&limit=${limit}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Gate.io API request failed');
+  }
+  
+  const data = await response.json();
+  
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('Gate.io data error or no data');
+  }
+  
+  // Gate.io returns: [timestamp, volume, close, high, low, open, amount]
+  return data.map((k: any[]) => ({
+    time: parseInt(k[0]),
+    open: parseFloat(k[5]),
+    high: parseFloat(k[3]),
+    low: parseFloat(k[4]),
+    close: parseFloat(k[2]),
+    volume: parseFloat(k[1]),
+  }));
+}
+
+async function fetchMarketSnapshotFromGate(symbol: string): Promise<MarketSnapshot> {
+  const gateSymbol = toGateSymbol(symbol);
+  
+  const response = await fetch(
+    `${GATE_BASE_URL}/spot/tickers?currency_pair=${gateSymbol}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Gate.io API request failed');
+  }
+  
+  const data = await response.json();
+  
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('Gate.io data error');
+  }
+  
+  const ticker = data[0];
+  const price = parseFloat(ticker.last);
+  const changePercent24h = parseFloat(ticker.change_percentage);
+  const high24h = parseFloat(ticker.high_24h);
+  const low24h = parseFloat(ticker.low_24h);
+  const open24h = price / (1 + changePercent24h / 100);
+  const change24h = price - open24h;
+  
+  return {
+    symbol,
+    price,
+    change24h,
+    changePercent24h,
+    high24h,
+    low24h,
+    volume24h: parseFloat(ticker.base_volume),
   };
 }
 
@@ -149,38 +245,56 @@ async function fetchMarketSnapshotFromBinance(symbol: string): Promise<MarketSna
   };
 }
 
-// ============= Unified API with fallback =============
+// ============= Unified API with fallback (OKX -> Gate.io -> Binance) =============
 export async function fetchKlines(
   symbol: string,
   interval: TimeFrame,
   limit: number = 200
 ): Promise<Kline[]> {
-  // Try OKX first, fallback to Binance
+  // Try OKX first
   try {
     return await fetchKlinesFromOkx(symbol, interval, limit);
   } catch (okxError) {
-    console.log('OKX failed, trying Binance...', okxError);
-    try {
-      return await fetchKlinesFromBinance(symbol, interval, limit);
-    } catch (binanceError) {
-      console.error('Both APIs failed:', binanceError);
-      throw new Error('无法获取K线数据，请检查交易对是否正确');
-    }
+    console.log('OKX failed, trying Gate.io...', okxError);
+  }
+  
+  // Try Gate.io second (good for meme coins)
+  try {
+    return await fetchKlinesFromGate(symbol, interval, limit);
+  } catch (gateError) {
+    console.log('Gate.io failed, trying Binance...', gateError);
+  }
+  
+  // Try Binance last
+  try {
+    return await fetchKlinesFromBinance(symbol, interval, limit);
+  } catch (binanceError) {
+    console.error('All APIs failed:', binanceError);
+    throw new Error('无法获取K线数据，请检查交易对是否正确（已尝试OKX/Gate.io/Binance）');
   }
 }
 
 export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
-  // Try OKX first, fallback to Binance
+  // Try OKX first
   try {
     return await fetchMarketSnapshotFromOkx(symbol);
   } catch (okxError) {
-    console.log('OKX failed, trying Binance...', okxError);
-    try {
-      return await fetchMarketSnapshotFromBinance(symbol);
-    } catch (binanceError) {
-      console.error('Both APIs failed:', binanceError);
-      throw new Error('无法获取行情数据，请检查交易对是否正确');
-    }
+    console.log('OKX failed, trying Gate.io...', okxError);
+  }
+  
+  // Try Gate.io second (good for meme coins)
+  try {
+    return await fetchMarketSnapshotFromGate(symbol);
+  } catch (gateError) {
+    console.log('Gate.io failed, trying Binance...', gateError);
+  }
+  
+  // Try Binance last
+  try {
+    return await fetchMarketSnapshotFromBinance(symbol);
+  } catch (binanceError) {
+    console.error('All APIs failed:', binanceError);
+    throw new Error('无法获取行情数据，请检查交易对是否正确（已尝试OKX/Gate.io/Binance）');
   }
 }
 
@@ -188,11 +302,13 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
 const POPULAR_SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
   'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
+  'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'WIFUSDT', // Popular meme coins
 ];
 
 // Caches
 let okxSymbolsCache: string[] = [];
 let binanceSymbolsCache: string[] = [];
+let gateSymbolsCache: string[] = [];
 let cacheTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -218,20 +334,34 @@ async function fetchBinanceSymbols(): Promise<string[]> {
     .map((s: any) => s.symbol);
 }
 
+async function fetchGateSymbols(): Promise<string[]> {
+  const response = await fetch(`${GATE_BASE_URL}/spot/currency_pairs`);
+  if (!response.ok) throw new Error('Failed to fetch Gate.io symbols');
+  
+  const data = await response.json();
+  return data
+    .filter((s: any) => s.quote === 'USDT' && s.trade_status === 'tradable')
+    .map((s: any) => s.id.replace('_', ''));
+}
+
 async function fetchAllSymbols(): Promise<string[]> {
   // Return cache if valid
   if (okxSymbolsCache.length > 0 && Date.now() - cacheTime < CACHE_DURATION) {
-    return [...new Set([...okxSymbolsCache, ...binanceSymbolsCache])];
+    return [...new Set([...okxSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
   }
 
-  // Fetch from both exchanges in parallel
-  const [okxResult, binanceResult] = await Promise.allSettled([
+  // Fetch from all exchanges in parallel
+  const [okxResult, gateResult, binanceResult] = await Promise.allSettled([
     fetchOkxSymbols(),
+    fetchGateSymbols(),
     fetchBinanceSymbols(),
   ]);
 
   if (okxResult.status === 'fulfilled') {
     okxSymbolsCache = okxResult.value;
+  }
+  if (gateResult.status === 'fulfilled') {
+    gateSymbolsCache = gateResult.value;
   }
   if (binanceResult.status === 'fulfilled') {
     binanceSymbolsCache = binanceResult.value;
@@ -240,7 +370,7 @@ async function fetchAllSymbols(): Promise<string[]> {
   cacheTime = Date.now();
 
   // Merge and dedupe
-  const allSymbols = [...new Set([...okxSymbolsCache, ...binanceSymbolsCache])];
+  const allSymbols = [...new Set([...okxSymbolsCache, ...gateSymbolsCache, ...binanceSymbolsCache])];
   
   // Sort with popular symbols first
   return allSymbols.sort((a, b) => {
