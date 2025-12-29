@@ -10,6 +10,7 @@ import { MarketHeader } from '@/components/MarketHeader';
 import { KlineChart } from '@/components/KlineChart';
 import { IndicatorPanel } from '@/components/IndicatorPanel';
 import { AnalysisReport } from '@/components/AnalysisReport';
+import { ApiConfigDialog, getApiConfig } from '@/components/ApiConfigDialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -69,64 +70,108 @@ const Index = () => {
       return;
     }
 
+    const config = getApiConfig();
+    
+    if (!config.apiKey) {
+      toast({
+        title: 'API Key 未配置',
+        description: '请点击右上角设置按钮配置 API Key',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
     
     try {
       const prompt = generateAnalysisPrompt(symbol, timeframe, klines, indicators);
       
-      // For now, we'll show a message that Cloud needs to be enabled
-      // This will be replaced with actual AI call once Cloud is set up
-      toast({
-        title: 'AI分析功能',
-        description: '需要启用 Lovable Cloud 以使用 AI 分析功能',
+      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            { 
+              role: 'system', 
+              content: '你是币圈顶级量化交易员+链上数据分析师+技术派K线大师，经验超过10年。只说干货，不废话，不预测"一定会涨/跌"，只给高概率情景+风险提示。请用JSON格式回复。' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 4096,
+        }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API请求失败: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
       
-      // Simulate analysis for demo purposes
-      const mockAnalysis: TechnicalAnalysis = {
-        snapshot: `${symbol} 在过去7天呈现震荡走势，价格在 ${(snapshot?.low24h || 0).toLocaleString()} - ${(snapshot?.high24h || 0).toLocaleString()} 区间运行。24小时成交量${(snapshot?.changePercent24h || 0) > 0 ? '放大' : '萎缩'}，当前价格位于布林带${(indicators?.bollingerBands?.middle || 0) < (snapshot?.price || 0) ? '上半区' : '下半区'}。`,
-        indicators: `均线系统：${indicators?.ma7 && indicators?.ma21 && indicators.ma7 > indicators.ma21 ? 'MA7上穿MA21形成金叉，短期偏多' : 'MA7下穿MA21形成死叉，短期偏空'}。\n\nRSI(14)=${indicators?.rsi?.toFixed(1)}，${(indicators?.rsi || 50) > 70 ? '超买区间，注意回调风险' : (indicators?.rsi || 50) < 30 ? '超卖区间，可能存在反弹机会' : '中性区间，等待方向选择'}。\n\nMACD：${(indicators?.macd?.histogram || 0) > 0 ? '红柱放大，多头动能增强' : '绿柱放大，空头动能增强'}。`,
-        timeframes: `当前${timeframe}级别${(indicators?.ma7 || 0) > (indicators?.ma21 || 0) ? '多头排列' : '空头排列'}，需结合更高级别确认趋势。建议关注日线级别的支撑阻力位。`,
-        scenarios: [
-          {
-            type: 'bull',
-            probability: 45,
-            trigger: `突破 ${((snapshot?.high24h || 0) * 1.02).toFixed(2)}`,
-            target: (snapshot?.price || 0) * 1.08,
-            stopLoss: (snapshot?.low24h || 0) * 0.98,
-            description: '若有效突破近期高点伴随放量，上方目标看前高压力位'
-          },
-          {
-            type: 'bear',
-            probability: 30,
-            trigger: `跌破 ${((snapshot?.low24h || 0) * 0.98).toFixed(2)}`,
-            target: (snapshot?.price || 0) * 0.92,
-            stopLoss: (snapshot?.high24h || 0) * 1.02,
-            description: '若跌破关键支撑，下方看前低支撑区域'
-          },
-          {
-            type: 'neutral',
-            probability: 25,
-            trigger: '区间震荡',
-            target: (snapshot?.price || 0),
-            stopLoss: (snapshot?.low24h || 0) * 0.95,
-            description: '在当前区间内高抛低吸，等待明确方向选择'
+      const parsedAnalysis = parseAnalysisResponse(content);
+      
+      if (parsedAnalysis) {
+        setAnalysis(parsedAnalysis);
+        toast({
+          title: 'AI分析完成',
+          description: '技术分析报告已生成',
+        });
+      } else {
+        // Fallback to mock analysis if parsing fails
+        const mockAnalysis: TechnicalAnalysis = {
+          snapshot: `${symbol} 在过去7天呈现震荡走势，价格在 ${(snapshot?.low24h || 0).toLocaleString()} - ${(snapshot?.high24h || 0).toLocaleString()} 区间运行。24小时成交量${(snapshot?.changePercent24h || 0) > 0 ? '放大' : '萎缩'}，当前价格位于布林带${(indicators?.bollingerBands?.middle || 0) < (snapshot?.price || 0) ? '上半区' : '下半区'}。`,
+          indicators: `均线系统：${indicators?.ma7 && indicators?.ma21 && indicators.ma7 > indicators.ma21 ? 'MA7上穿MA21形成金叉，短期偏多' : 'MA7下穿MA21形成死叉，短期偏空'}。\n\nRSI(14)=${indicators?.rsi?.toFixed(1)}，${(indicators?.rsi || 50) > 70 ? '超买区间，注意回调风险' : (indicators?.rsi || 50) < 30 ? '超卖区间，可能存在反弹机会' : '中性区间，等待方向选择'}。\n\nMACD：${(indicators?.macd?.histogram || 0) > 0 ? '红柱放大，多头动能增强' : '绿柱放大，空头动能增强'}。`,
+          timeframes: `当前${timeframe}级别${(indicators?.ma7 || 0) > (indicators?.ma21 || 0) ? '多头排列' : '空头排列'}，需结合更高级别确认趋势。建议关注日线级别的支撑阻力位。`,
+          scenarios: [
+            {
+              type: 'bull',
+              probability: 45,
+              trigger: `突破 ${((snapshot?.high24h || 0) * 1.02).toFixed(2)}`,
+              target: (snapshot?.price || 0) * 1.08,
+              stopLoss: (snapshot?.low24h || 0) * 0.98,
+              description: '若有效突破近期高点伴随放量，上方目标看前高压力位'
+            },
+            {
+              type: 'bear',
+              probability: 30,
+              trigger: `跌破 ${((snapshot?.low24h || 0) * 0.98).toFixed(2)}`,
+              target: (snapshot?.price || 0) * 0.92,
+              stopLoss: (snapshot?.high24h || 0) * 1.02,
+              description: '若跌破关键支撑，下方看前低支撑区域'
+            },
+            {
+              type: 'neutral',
+              probability: 25,
+              trigger: '区间震荡',
+              target: (snapshot?.price || 0),
+              stopLoss: (snapshot?.low24h || 0) * 0.95,
+              description: '在当前区间内高抛低吸，等待明确方向选择'
+            }
+          ],
+          risks: [
+            '加密市场波动剧烈，需严格控制仓位',
+            '注意假突破陷阱，等待K线收盘确认',
+            '关注大盘整体走势和宏观消息面',
+            '设置止损，严格执行交易纪律'
+          ],
+          summary: {
+            stance: (indicators?.rsi || 50) > 60 && (indicators?.macd?.histogram || 0) > 0 ? 'aggressive' : 
+                    (indicators?.rsi || 50) < 40 && (indicators?.macd?.histogram || 0) < 0 ? 'wait' : 'stable',
+            position: (indicators?.rsi || 50) > 60 ? 60 : (indicators?.rsi || 50) < 40 ? 20 : 40,
+            advice: `当前建议${(indicators?.rsi || 50) > 60 ? '轻仓做多，注意止盈' : (indicators?.rsi || 50) < 40 ? '观望为主，等待企稳信号' : '保持观望，等待明确信号再入场'}。严格执行止损纪律，仓位不超过建议比例。`
           }
-        ],
-        risks: [
-          '加密市场波动剧烈，需严格控制仓位',
-          '注意假突破陷阱，等待K线收盘确认',
-          '关注大盘整体走势和宏观消息面',
-          '设置止损，严格执行交易纪律'
-        ],
-        summary: {
-          stance: (indicators?.rsi || 50) > 60 && (indicators?.macd?.histogram || 0) > 0 ? 'aggressive' : 
-                  (indicators?.rsi || 50) < 40 && (indicators?.macd?.histogram || 0) < 0 ? 'wait' : 'stable',
-          position: (indicators?.rsi || 50) > 60 ? 60 : (indicators?.rsi || 50) < 40 ? 20 : 40,
-          advice: `当前建议${(indicators?.rsi || 50) > 60 ? '轻仓做多，注意止盈' : (indicators?.rsi || 50) < 40 ? '观望为主，等待企稳信号' : '保持观望，等待明确信号再入场'}。严格执行止损纪律，仓位不超过建议比例。`
-        }
-      };
-      
-      setAnalysis(mockAnalysis);
+        };
+        setAnalysis(mockAnalysis);
+        toast({
+          title: 'AI分析完成',
+          description: '使用本地计算结果（AI响应解析失败）',
+        });
+      }
       
     } catch (error) {
       toast({
@@ -165,6 +210,8 @@ const Index = () => {
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
+              
+              <ApiConfigDialog />
             </div>
           </div>
         </div>
