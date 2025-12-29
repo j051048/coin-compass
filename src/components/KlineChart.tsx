@@ -22,6 +22,7 @@ const COLORS = {
 interface KlineChartProps {
   klines: Kline[];
   showMA: boolean;
+  showVOL?: boolean;
   showBB: boolean;
   showMACD?: boolean;
   showRSI?: boolean;
@@ -59,15 +60,17 @@ const createSubChart = (container: HTMLDivElement, height: number) => {
   });
 };
 
-export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI = false, showKDJ = false, showWR = false }: KlineChartProps) {
+export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD = false, showRSI = false, showKDJ = false, showWR = false }: KlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
+  const volContainerRef = useRef<HTMLDivElement>(null);
   const macdContainerRef = useRef<HTMLDivElement>(null);
   const rsiContainerRef = useRef<HTMLDivElement>(null);
   const kdjContainerRef = useRef<HTMLDivElement>(null);
   const wrContainerRef = useRef<HTMLDivElement>(null);
   
   const chartRef = useRef<IChartApi | null>(null);
+  const volChartRef = useRef<IChartApi | null>(null);
   const macdChartRef = useRef<IChartApi | null>(null);
   const rsiChartRef = useRef<IChartApi | null>(null);
   const kdjChartRef = useRef<IChartApi | null>(null);
@@ -78,7 +81,7 @@ export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI =
   const bbSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
 
   // Calculate active sub-charts count for height distribution
-  const subChartCount = [showMACD, showRSI, showKDJ, showWR].filter(Boolean).length;
+  const subChartCount = [showVOL, showMACD, showRSI, showKDJ, showWR].filter(Boolean).length;
   const mainChartHeight = subChartCount > 0 ? 320 : 400;
   const subChartHeight = subChartCount > 0 ? Math.floor(180 / subChartCount) : 0;
 
@@ -135,6 +138,25 @@ export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI =
       chart.remove();
     };
   }, [mainChartHeight]);
+
+  // VOL sub-chart
+  useEffect(() => {
+    if (!showVOL || !volContainerRef.current) {
+      if (volChartRef.current) {
+        volChartRef.current.remove();
+        volChartRef.current = null;
+      }
+      return;
+    }
+
+    const chart = createSubChart(volContainerRef.current, subChartHeight);
+    volChartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      volChartRef.current = null;
+    };
+  }, [showVOL, subChartHeight]);
 
   // MACD sub-chart
   useEffect(() => {
@@ -297,6 +319,29 @@ export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI =
       });
     }
 
+    // VOL data
+    if (showVOL && volChartRef.current) {
+      const volChart = volChartRef.current;
+      
+      const volSeries = volChart.addHistogramSeries({
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const volData: HistogramData[] = klines.map((k, i) => {
+        const prevClose = i > 0 ? klines[i - 1].close : k.open;
+        const isUp = k.close >= prevClose;
+        return {
+          time: k.time as any,
+          value: k.volume,
+          color: isUp ? COLORS.bull : COLORS.bear,
+        };
+      });
+
+      volSeries.setData(volData);
+      volChart.timeScale().fitContent();
+    }
+
     // MACD data
     if (showMACD && macdChartRef.current) {
       const macdChart = macdChartRef.current;
@@ -436,11 +481,17 @@ export function KlineChart({ klines, showMA, showBB, showMACD = false, showRSI =
     }
 
     chart.timeScale().fitContent();
-  }, [klines, showMA, showBB, showMACD, showRSI, showKDJ, showWR]);
+  }, [klines, showMA, showVOL, showBB, showMACD, showRSI, showKDJ, showWR]);
 
   return (
     <div ref={containerRef} className="chart-container w-full h-full min-h-[400px] flex flex-col">
       <div ref={mainContainerRef} className="w-full flex-1" style={{ minHeight: mainChartHeight }} />
+      {showVOL && (
+        <div className="border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground px-2 py-1">VOL</div>
+          <div ref={volContainerRef} className="w-full" style={{ height: subChartHeight }} />
+        </div>
+      )}
       {showMACD && (
         <div className="border-t border-border/50">
           <div className="text-[10px] text-muted-foreground px-2 py-1">MACD</div>

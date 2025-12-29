@@ -59,6 +59,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showMA, setShowMA] = useState(true);
+  const [showVOL, setShowVOL] = useState(false);
   const [showBB, setShowBB] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
   const [showRSI, setShowRSI] = useState(false);
@@ -281,6 +282,15 @@ const Index = () => {
                 均线
               </Button>
               <Button
+                variant={showVOL ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowVOL(!showVOL)}
+                className="text-xs"
+              >
+                {showVOL ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                VOL
+              </Button>
+              <Button
                 variant={showBB ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowBB(!showBB)}
@@ -331,7 +341,8 @@ const Index = () => {
             <div className="h-[500px]">
               <KlineChart 
                 klines={klines} 
-                showMA={showMA} 
+                showMA={showMA}
+                showVOL={showVOL}
                 showBB={showBB}
                 showMACD={showMACD}
                 showRSI={showRSI}
