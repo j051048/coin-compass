@@ -1,10 +1,8 @@
 import { Kline, MarketSnapshot, TimeFrame } from '@/types/trading';
+import { supabase } from '@/integrations/supabase/client';
 
-// API endpoints
+// API endpoints (fallback for direct OKX calls which support CORS)
 const OKX_BASE_URL = 'https://www.okx.com/api/v5';
-const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
-const GATE_BASE_URL = 'https://api.gateio.ws/api/v4';
-const MEXC_BASE_URL = 'https://api.mexc.com/api/v3';
 
 // Data source type
 export type DataSource = 'OKX' | 'MEXC' | 'Gate' | 'Binance';
@@ -78,7 +76,7 @@ function toMexcInterval(interval: TimeFrame): string {
   return map[interval] || '1h';
 }
 
-// ============= OKX API =============
+// ============= OKX API (Direct - supports CORS) =============
 async function fetchKlinesFromOkx(
   symbol: string,
   interval: TimeFrame,
@@ -148,7 +146,85 @@ async function fetchMarketSnapshotFromOkx(symbol: string): Promise<MarketSnapsho
   };
 }
 
-// ============= Gate.io API =============
+// ============= MEXC API (via Edge Function Proxy) =============
+async function fetchKlinesFromMexc(
+  symbol: string,
+  interval: TimeFrame,
+  limit: number
+): Promise<Kline[]> {
+  const mexcInterval = toMexcInterval(interval);
+  const endpoint = `/api/v3/klines?symbol=${symbol}&interval=${mexcInterval}&limit=${limit}`;
+  
+  const { data, error } = await supabase.functions.invoke('kline-proxy', {
+    body: null,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  // Use query params approach
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=mexc&endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('MEXC API request failed via proxy');
+  }
+  
+  const result = await response.json();
+  
+  if (result.error || !Array.isArray(result) || result.length === 0) {
+    throw new Error(result.error || 'MEXC data error or no data');
+  }
+  
+  // MEXC returns same format as Binance: [openTime, open, high, low, close, volume, ...]
+  return result.map((k: any[]) => ({
+    time: k[0] / 1000,
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
+}
+
+async function fetchMarketSnapshotFromMexc(symbol: string): Promise<MarketSnapshot> {
+  const endpoint = `/api/v3/ticker/24hr?symbol=${symbol}`;
+  
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=mexc&endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('MEXC API request failed via proxy');
+  }
+  
+  const ticker = await response.json();
+  
+  if (ticker.error || !ticker || ticker.code) {
+    throw new Error(ticker?.error || ticker?.msg || 'MEXC data error');
+  }
+  
+  return {
+    symbol,
+    price: parseFloat(ticker.lastPrice),
+    change24h: parseFloat(ticker.priceChange),
+    changePercent24h: parseFloat(ticker.priceChangePercent),
+    high24h: parseFloat(ticker.highPrice),
+    low24h: parseFloat(ticker.lowPrice),
+    volume24h: parseFloat(ticker.volume),
+  };
+}
+
+// ============= Gate.io API (via Edge Function Proxy) =============
 async function fetchKlinesFromGate(
   symbol: string,
   interval: TimeFrame,
@@ -156,19 +232,25 @@ async function fetchKlinesFromGate(
 ): Promise<Kline[]> {
   const gateSymbol = toGateSymbol(symbol);
   const gateInterval = toGateInterval(interval);
+  const endpoint = `/api/v4/spot/candlesticks?currency_pair=${gateSymbol}&interval=${gateInterval}&limit=${limit}`;
   
   const response = await fetch(
-    `${GATE_BASE_URL}/spot/candlesticks?currency_pair=${gateSymbol}&interval=${gateInterval}&limit=${limit}`
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=gate&endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+    }
   );
   
   if (!response.ok) {
-    throw new Error('Gate.io API request failed');
+    throw new Error('Gate.io API request failed via proxy');
   }
   
   const data = await response.json();
   
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('Gate.io data error or no data');
+  if (data.error || !Array.isArray(data) || data.length === 0) {
+    throw new Error(data.error || 'Gate.io data error or no data');
   }
   
   // Gate.io returns: [timestamp, volume, close, high, low, open, amount]
@@ -184,19 +266,25 @@ async function fetchKlinesFromGate(
 
 async function fetchMarketSnapshotFromGate(symbol: string): Promise<MarketSnapshot> {
   const gateSymbol = toGateSymbol(symbol);
+  const endpoint = `/api/v4/spot/tickers?currency_pair=${gateSymbol}`;
   
   const response = await fetch(
-    `${GATE_BASE_URL}/spot/tickers?currency_pair=${gateSymbol}`
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=gate&endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+    }
   );
   
   if (!response.ok) {
-    throw new Error('Gate.io API request failed');
+    throw new Error('Gate.io API request failed via proxy');
   }
   
   const data = await response.json();
   
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('Gate.io data error');
+  if (data.error || !Array.isArray(data) || data.length === 0) {
+    throw new Error(data.error || 'Gate.io data error');
   }
   
   const ticker = data[0];
@@ -218,78 +306,32 @@ async function fetchMarketSnapshotFromGate(symbol: string): Promise<MarketSnapsh
   };
 }
 
-// ============= MEXC API =============
-async function fetchKlinesFromMexc(
-  symbol: string,
-  interval: TimeFrame,
-  limit: number
-): Promise<Kline[]> {
-  const mexcInterval = toMexcInterval(interval);
-  
-  const response = await fetch(
-    `${MEXC_BASE_URL}/klines?symbol=${symbol}&interval=${mexcInterval}&limit=${limit}`
-  );
-  
-  if (!response.ok) {
-    throw new Error('MEXC API request failed');
-  }
-  
-  const data = await response.json();
-  
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('MEXC data error or no data');
-  }
-  
-  // MEXC returns same format as Binance: [openTime, open, high, low, close, volume, ...]
-  return data.map((k: any[]) => ({
-    time: k[0] / 1000,
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5]),
-  }));
-}
-
-async function fetchMarketSnapshotFromMexc(symbol: string): Promise<MarketSnapshot> {
-  const response = await fetch(`${MEXC_BASE_URL}/ticker/24hr?symbol=${symbol}`);
-  
-  if (!response.ok) {
-    throw new Error('MEXC API request failed');
-  }
-  
-  const ticker = await response.json();
-  
-  if (!ticker || ticker.code) {
-    throw new Error(ticker?.msg || 'MEXC data error');
-  }
-  
-  return {
-    symbol,
-    price: parseFloat(ticker.lastPrice),
-    change24h: parseFloat(ticker.priceChange),
-    changePercent24h: parseFloat(ticker.priceChangePercent),
-    high24h: parseFloat(ticker.highPrice),
-    low24h: parseFloat(ticker.lowPrice),
-    volume24h: parseFloat(ticker.volume),
-  };
-}
-
-// ============= Binance API =============
+// ============= Binance API (via Edge Function Proxy) =============
 async function fetchKlinesFromBinance(
   symbol: string,
   interval: TimeFrame,
   limit: number
 ): Promise<Kline[]> {
+  const endpoint = `/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  
   const response = await fetch(
-    `${BINANCE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=binance&endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+    }
   );
   
   if (!response.ok) {
-    throw new Error('Binance API request failed');
+    throw new Error('Binance API request failed via proxy');
   }
   
   const data = await response.json();
+  
+  if (data.error || !Array.isArray(data)) {
+    throw new Error(data.error || 'Binance data error');
+  }
   
   return data.map((k: any[]) => ({
     time: k[0] / 1000,
@@ -302,17 +344,38 @@ async function fetchKlinesFromBinance(
 }
 
 async function fetchMarketSnapshotFromBinance(symbol: string): Promise<MarketSnapshot> {
+  const tickerEndpoint = `/api/v3/ticker/24hr?symbol=${symbol}`;
+  const priceEndpoint = `/api/v3/ticker/price?symbol=${symbol}`;
+  
   const [tickerResponse, priceResponse] = await Promise.all([
-    fetch(`${BINANCE_BASE_URL}/ticker/24hr?symbol=${symbol}`),
-    fetch(`${BINANCE_BASE_URL}/ticker/price?symbol=${symbol}`),
+    fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=binance&endpoint=${encodeURIComponent(tickerEndpoint)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      }
+    ),
+    fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=binance&endpoint=${encodeURIComponent(priceEndpoint)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      }
+    ),
   ]);
   
   if (!tickerResponse.ok || !priceResponse.ok) {
-    throw new Error('Binance API request failed');
+    throw new Error('Binance API request failed via proxy');
   }
   
   const ticker = await tickerResponse.json();
   const price = await priceResponse.json();
+  
+  if (ticker.error || price.error) {
+    throw new Error(ticker.error || price.error || 'Binance data error');
+  }
   
   return {
     symbol,
@@ -331,28 +394,28 @@ export async function fetchKlines(
   interval: TimeFrame,
   limit: number = 200
 ): Promise<Kline[]> {
-  // Try OKX first
+  // Try OKX first (supports CORS directly)
   try {
     return await fetchKlinesFromOkx(symbol, interval, limit);
   } catch (okxError) {
     console.log('OKX failed, trying MEXC...', okxError);
   }
   
-  // Try MEXC second (good for meme coins, no CORS issues)
+  // Try MEXC second via proxy (good for meme coins)
   try {
     return await fetchKlinesFromMexc(symbol, interval, limit);
   } catch (mexcError) {
     console.log('MEXC failed, trying Gate.io...', mexcError);
   }
   
-  // Try Gate.io third
+  // Try Gate.io third via proxy
   try {
     return await fetchKlinesFromGate(symbol, interval, limit);
   } catch (gateError) {
     console.log('Gate.io failed, trying Binance...', gateError);
   }
   
-  // Try Binance last
+  // Try Binance last via proxy
   try {
     return await fetchKlinesFromBinance(symbol, interval, limit);
   } catch (binanceError) {
@@ -362,7 +425,7 @@ export async function fetchKlines(
 }
 
 export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapshotWithSource> {
-  // Try OKX first
+  // Try OKX first (supports CORS directly)
   try {
     const data = await fetchMarketSnapshotFromOkx(symbol);
     return { ...data, dataSource: 'OKX' };
@@ -370,7 +433,7 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     console.log('OKX failed, trying MEXC...', okxError);
   }
   
-  // Try MEXC second (good for meme coins, no CORS issues)
+  // Try MEXC second via proxy (good for meme coins)
   try {
     const data = await fetchMarketSnapshotFromMexc(symbol);
     return { ...data, dataSource: 'MEXC' };
@@ -378,7 +441,7 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     console.log('MEXC failed, trying Gate.io...', mexcError);
   }
   
-  // Try Gate.io third
+  // Try Gate.io third via proxy
   try {
     const data = await fetchMarketSnapshotFromGate(symbol);
     return { ...data, dataSource: 'Gate' };
@@ -386,7 +449,7 @@ export async function fetchMarketSnapshot(symbol: string): Promise<MarketSnapsho
     console.log('Gate.io failed, trying Binance...', gateError);
   }
   
-  // Try Binance last
+  // Try Binance last via proxy
   try {
     const data = await fetchMarketSnapshotFromBinance(symbol);
     return { ...data, dataSource: 'Binance' };
@@ -423,38 +486,88 @@ async function fetchOkxSymbols(): Promise<string[]> {
     .map((s: any) => s.instId.replace('-', ''));
 }
 
-async function fetchBinanceSymbols(): Promise<string[]> {
-  const response = await fetch(`${BINANCE_BASE_URL}/exchangeInfo`);
-  if (!response.ok) throw new Error('Failed to fetch Binance symbols');
-  
-  const data = await response.json();
-  return data.symbols
-    .filter((s: any) => s.status === 'TRADING' && s.quoteAsset === 'USDT')
-    .map((s: any) => s.symbol);
-}
-
-async function fetchGateSymbols(): Promise<string[]> {
-  // Gate.io API has CORS restrictions, so we maintain a curated list of popular meme coins
-  const GATE_MEME_COINS = [
-    'PIPPINUSDT', 'GOATUSDT', 'ACTUSDT', 'PNUTUSDT', 'NEIROUSDT',
-    'MOGUSDT', 'SPXUSDT', 'GLOWYUSDT', 'TOSHIUSDT', 'BRETTUSDT',
-    'POPCATUSDT', 'GIGAUSDT', 'MIKIUSDT', 'SUNWUKONGUSDT', 'RETARDUSDT',
-    'LOCKINUSDT', 'GRIFFAINUSDT', 'AI16ZUSDT', 'FARTCOINUSDT', 'ZEREBRUSDT',
-  ];
-  return GATE_MEME_COINS;
-}
-
 async function fetchMexcSymbols(): Promise<string[]> {
   try {
-    const response = await fetch(`${MEXC_BASE_URL}/exchangeInfo`);
+    const endpoint = '/api/v3/exchangeInfo';
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=mexc&endpoint=${encodeURIComponent(endpoint)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      }
+    );
+    
     if (!response.ok) throw new Error('Failed to fetch MEXC symbols');
     
     const data = await response.json();
+    if (data.error || !data.symbols) throw new Error('MEXC symbols error');
+    
     return data.symbols
       .filter((s: any) => s.status === 'ENABLED' && s.quoteAsset === 'USDT')
       .map((s: any) => s.symbol);
   } catch (error) {
     console.log('MEXC symbols fetch failed:', error);
+    return [];
+  }
+}
+
+async function fetchGateSymbols(): Promise<string[]> {
+  // Gate.io - we can now fetch via proxy
+  try {
+    const endpoint = '/api/v4/spot/currency_pairs';
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=gate&endpoint=${encodeURIComponent(endpoint)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      }
+    );
+    
+    if (!response.ok) throw new Error('Failed to fetch Gate symbols');
+    
+    const data = await response.json();
+    if (data.error || !Array.isArray(data)) throw new Error('Gate symbols error');
+    
+    return data
+      .filter((s: any) => s.quote === 'USDT' && s.trade_status === 'tradable')
+      .map((s: any) => s.id.replace('_', ''));
+  } catch (error) {
+    console.log('Gate symbols fetch failed, using fallback:', error);
+    // Fallback list of popular meme coins on Gate.io
+    const GATE_MEME_COINS = [
+      'PIPPINUSDT', 'GOATUSDT', 'ACTUSDT', 'PNUTUSDT', 'NEIROUSDT',
+      'MOGUSDT', 'SPXUSDT', 'GLOWYUSDT', 'TOSHIUSDT', 'BRETTUSDT',
+      'POPCATUSDT', 'GIGAUSDT', 'MIKIUSDT', 'SUNWUKONGUSDT', 'RETARDUSDT',
+      'LOCKINUSDT', 'GRIFFAINUSDT', 'AI16ZUSDT', 'FARTCOINUSDT', 'ZEREBRUSDT',
+    ];
+    return GATE_MEME_COINS;
+  }
+}
+
+async function fetchBinanceSymbols(): Promise<string[]> {
+  try {
+    const endpoint = '/api/v3/exchangeInfo';
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kline-proxy?exchange=binance&endpoint=${encodeURIComponent(endpoint)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      }
+    );
+    
+    if (!response.ok) throw new Error('Failed to fetch Binance symbols');
+    
+    const data = await response.json();
+    if (data.error || !data.symbols) throw new Error('Binance symbols error');
+    
+    return data.symbols
+      .filter((s: any) => s.status === 'TRADING' && s.quoteAsset === 'USDT')
+      .map((s: any) => s.symbol);
+  } catch (error) {
+    console.log('Binance symbols fetch failed:', error);
     return [];
   }
 }
@@ -503,21 +616,18 @@ async function fetchAllSymbols(): Promise<string[]> {
 }
 
 export async function searchSymbols(query: string): Promise<string[]> {
+  if (!query || query.length < 1) {
+    return POPULAR_SYMBOLS;
+  }
+  
+  const upperQuery = query.toUpperCase();
+  
   try {
     const allSymbols = await fetchAllSymbols();
-    
-    if (!query) {
-      return allSymbols.slice(0, 30);
-    }
-    
-    return allSymbols
-      .filter((s) => s.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 30);
+    const matches = allSymbols.filter(s => s.includes(upperQuery));
+    return matches.slice(0, 20);
   } catch (error) {
-    console.error('Failed to fetch symbols:', error);
-    if (!query) return POPULAR_SYMBOLS;
-    return POPULAR_SYMBOLS.filter((s) => 
-      s.toLowerCase().includes(query.toLowerCase())
-    );
+    console.error('Symbol search failed:', error);
+    return POPULAR_SYMBOLS.filter(s => s.includes(upperQuery));
   }
 }
