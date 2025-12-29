@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 export interface ApiConfig {
@@ -19,10 +20,19 @@ interface LogEntry {
   message: string;
 }
 
+// Available models - Latest Google and OpenAI models (Dec 2025)
+const AVAILABLE_MODELS = [
+  { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'Google' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'Google' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google' },
+  { value: 'gpt-5', label: 'GPT-5', provider: 'OpenAI' },
+  { value: 'gpt-5-mini', label: 'GPT-5 Mini', provider: 'OpenAI' },
+];
+
 const DEFAULT_CONFIG: ApiConfig = {
   baseUrl: 'https://proxy.flydao.top/v1',
-  apiKey: '',
-  model: 'gemini-3.0-pro',
+  apiKey: '123456',
+  model: 'gemini-3-flash-preview',
 };
 
 const STORAGE_KEY = 'kline-api-config';
@@ -196,13 +206,24 @@ export const ApiConfigDialog = () => {
             <Label htmlFor="model" className="text-sm text-muted-foreground">
               模型
             </Label>
-            <Input
-              id="model"
+            <Select
               value={config.model}
-              onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-              placeholder="gemini-3.0-pro"
-              className="bg-background border-border font-mono text-sm"
-            />
+              onValueChange={(value) => setConfig(prev => ({ ...prev, model: value }))}
+            >
+              <SelectTrigger className="bg-background border-border">
+                <SelectValue placeholder="选择模型" />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{model.label}</span>
+                      <span className="text-xs text-muted-foreground">({model.provider})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Action Buttons */}
