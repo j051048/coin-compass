@@ -153,6 +153,65 @@ export function calculateIndicators(klines: Kline[]): IndicatorValues {
   };
 }
 
+export function calculateKDJ(
+  klines: Kline[],
+  period: number = 9,
+  kPeriod: number = 3,
+  dPeriod: number = 3
+): { k: number | null; d: number | null; j: number | null }[] {
+  const result: { k: number | null; d: number | null; j: number | null }[] = [];
+  let prevK = 50;
+  let prevD = 50;
+
+  for (let i = 0; i < klines.length; i++) {
+    if (i < period - 1) {
+      result.push({ k: null, d: null, j: null });
+      continue;
+    }
+
+    const slice = klines.slice(i - period + 1, i + 1);
+    const highestHigh = Math.max(...slice.map(k => k.high));
+    const lowestLow = Math.min(...slice.map(k => k.low));
+    const close = klines[i].close;
+
+    const rsv = highestHigh === lowestLow ? 50 : ((close - lowestLow) / (highestHigh - lowestLow)) * 100;
+    const k = (2 / kPeriod) * rsv + ((kPeriod - 2) / kPeriod) * prevK;
+    const d = (2 / dPeriod) * k + ((dPeriod - 2) / dPeriod) * prevD;
+    const j = 3 * k - 2 * d;
+
+    prevK = k;
+    prevD = d;
+
+    result.push({ k, d, j });
+  }
+
+  return result;
+}
+
+export function calculateWilliamsR(
+  klines: Kline[],
+  period: number = 14
+): (number | null)[] {
+  const result: (number | null)[] = [];
+
+  for (let i = 0; i < klines.length; i++) {
+    if (i < period - 1) {
+      result.push(null);
+      continue;
+    }
+
+    const slice = klines.slice(i - period + 1, i + 1);
+    const highestHigh = Math.max(...slice.map(k => k.high));
+    const lowestLow = Math.min(...slice.map(k => k.low));
+    const close = klines[i].close;
+
+    const wr = highestHigh === lowestLow ? -50 : ((highestHigh - close) / (highestHigh - lowestLow)) * -100;
+    result.push(wr);
+  }
+
+  return result;
+}
+
 export function getIndicatorSeries(klines: Kline[]) {
   const closes = klines.map((k) => k.close);
   
@@ -164,5 +223,7 @@ export function getIndicatorSeries(klines: Kline[]) {
     rsi: calculateRSI(closes, 14),
     macd: calculateMACD(closes),
     bollingerBands: calculateBollingerBands(closes, 20, 2),
+    kdj: calculateKDJ(klines),
+    williamsR: calculateWilliamsR(klines),
   };
 }

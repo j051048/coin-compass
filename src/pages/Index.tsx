@@ -25,6 +25,10 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showMA, setShowMA] = useState(true);
   const [showBB, setShowBB] = useState(false);
+  const [showMACD, setShowMACD] = useState(false);
+  const [showRSI, setShowRSI] = useState(false);
+  const [showKDJ, setShowKDJ] = useState(false);
+  const [showWR, setShowWR] = useState(false);
   const { toast } = useToast();
 
   const loadData = useCallback(async () => {
@@ -225,7 +229,7 @@ const Index = () => {
             <MarketHeader snapshot={snapshot} isLoading={isLoading} />
             
             {/* Chart Controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant={showMA ? 'default' : 'outline'}
                 size="sm"
@@ -244,11 +248,55 @@ const Index = () => {
                 {showBB ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 布林带
               </Button>
+              <Button
+                variant={showMACD ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowMACD(!showMACD)}
+                className="text-xs"
+              >
+                {showMACD ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                MACD
+              </Button>
+              <Button
+                variant={showRSI ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowRSI(!showRSI)}
+                className="text-xs"
+              >
+                {showRSI ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                RSI
+              </Button>
+              <Button
+                variant={showKDJ ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowKDJ(!showKDJ)}
+                className="text-xs"
+              >
+                {showKDJ ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                KDJ
+              </Button>
+              <Button
+                variant={showWR ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowWR(!showWR)}
+                className="text-xs"
+              >
+                {showWR ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                W%R
+              </Button>
             </div>
             
             {/* Chart */}
             <div className="h-[500px]">
-              <KlineChart klines={klines} showMA={showMA} showBB={showBB} />
+              <KlineChart 
+                klines={klines} 
+                showMA={showMA} 
+                showBB={showBB}
+                showMACD={showMACD}
+                showRSI={showRSI}
+                showKDJ={showKDJ}
+                showWR={showWR}
+              />
             </div>
 
             {/* Analysis Button */}
