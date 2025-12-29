@@ -17,6 +17,8 @@ const COLORS = {
   kLine: '#eab308',     // K line yellow
   dLine: '#0ea5e9',     // D line blue
   jLine: '#a855f7',     // J line purple
+  rsi13: '#f97316',     // RSI(13) orange - 4h level
+  rsi42: '#06b6d4',     // RSI(42) cyan - daily level
 };
 
 interface KlineChartProps {
@@ -393,23 +395,40 @@ export function KlineChart({ klines, showMA, showVOL = false, showBB, showMACD =
       macdChart.timeScale().fitContent();
     }
 
-    // RSI data
+    // RSI data - dual RSI (13 and 42)
     if (showRSI && rsiChartRef.current) {
       const rsiChart = rsiChartRef.current;
       
-      const rsiSeries = rsiChart.addLineSeries({
-        color: COLORS.ma21,
+      // RSI(13) - 4h level
+      const rsi13Series = rsiChart.addLineSeries({
+        color: COLORS.rsi13,
         lineWidth: 1,
-        title: 'RSI',
+        title: 'RSI(13)',
         priceLineVisible: false,
         lastValueVisible: false,
       });
 
-      const rsiData: LineData[] = klines
-        .map((k, i) => ({ time: k.time as any, value: indicators.rsi[i] }))
+      const rsi13Data: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.rsi13[i] }))
         .filter((d) => d.value !== null) as LineData[];
 
-      rsiSeries.setData(rsiData);
+      rsi13Series.setData(rsi13Data);
+
+      // RSI(42) - daily level
+      const rsi42Series = rsiChart.addLineSeries({
+        color: COLORS.rsi42,
+        lineWidth: 1,
+        title: 'RSI(42)',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      const rsi42Data: LineData[] = klines
+        .map((k, i) => ({ time: k.time as any, value: indicators.rsi42[i] }))
+        .filter((d) => d.value !== null) as LineData[];
+
+      rsi42Series.setData(rsi42Data);
+
       rsiChart.timeScale().fitContent();
     }
 
