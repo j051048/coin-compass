@@ -102,7 +102,10 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
   }, []);
 
   useEffect(() => {
-    if (!chartRef.current || !candleSeriesRef.current || klines.length === 0) return;
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    
+    if (!chart || !candleSeries || klines.length === 0) return;
 
     const candleData: CandlestickData[] = klines.map((k) => ({
       time: k.time as any,
@@ -112,11 +115,15 @@ export function KlineChart({ klines, showMA, showBB }: KlineChartProps) {
       close: k.close,
     }));
 
-    candleSeriesRef.current.setData(candleData);
+    candleSeries.setData(candleData);
 
-    // Clear existing indicator series
-    maSeriesRefs.current.forEach((s) => chartRef.current?.removeSeries(s));
-    bbSeriesRefs.current.forEach((s) => chartRef.current?.removeSeries(s));
+    // Clear existing indicator series safely
+    maSeriesRefs.current.forEach((s) => {
+      try { chart.removeSeries(s); } catch (e) { /* series already removed */ }
+    });
+    bbSeriesRefs.current.forEach((s) => {
+      try { chart.removeSeries(s); } catch (e) { /* series already removed */ }
+    });
     maSeriesRefs.current = [];
     bbSeriesRefs.current = [];
 
