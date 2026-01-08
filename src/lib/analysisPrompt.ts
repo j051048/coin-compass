@@ -1,5 +1,5 @@
 import { Kline, IndicatorValues, TechnicalAnalysis, TimeFrame } from '@/types/trading';
-import { getSkillEnhancedPrompt, ACTIVE_SKILL } from './skills';
+import { getSkillEnhancedPrompt, ACTIVE_SKILLS } from './skills';
 
 export function generateAnalysisPrompt(
   symbol: string,
@@ -24,8 +24,8 @@ export function generateAnalysisPrompt(
   // Load skill/gem for enhanced analysis
   const skillPrompt = getSkillEnhancedPrompt();
 
-  return `## 已加载技能库: ${ACTIVE_SKILL.name} (v${ACTIVE_SKILL.version})
-## 技能作者: ${ACTIVE_SKILL.author}
+  return `## 已加载技能库: ${ACTIVE_SKILLS.map(s => s.name).join(' + ')}
+## 技能作者: ${ACTIVE_SKILLS.map(s => s.author).join(', ')}
 
 ${skillPrompt}
 

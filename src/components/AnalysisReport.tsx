@@ -1,5 +1,5 @@
 import { TechnicalAnalysis } from '@/types/trading';
-import { ACTIVE_SKILL } from '@/lib/skills';
+import { ACTIVE_SKILLS } from '@/lib/skills';
 import { 
   Target, 
   AlertTriangle, 
@@ -48,7 +48,7 @@ export function AnalysisReport({ analysis, isLoading }: AnalysisReportProps) {
         </p>
         <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
           <p className="text-xs text-primary font-medium mb-1">已加载技能库</p>
-          <p className="text-xs text-muted-foreground">{ACTIVE_SKILL.name}</p>
+          <p className="text-xs text-muted-foreground">{ACTIVE_SKILLS.map(s => s.name).join(' + ')}</p>
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ export function AnalysisReport({ analysis, isLoading }: AnalysisReportProps) {
       {/* Skill Badge */}
       <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 rounded-lg border border-primary/20">
         <Star className="w-4 h-4 text-primary" />
-        <span className="text-xs text-primary font-medium">技能库: {ACTIVE_SKILL.name}</span>
+        <span className="text-xs text-primary font-medium">技能库: {ACTIVE_SKILLS.map(s => s.name).join(' + ')}</span>
       </div>
 
       {/* Market Snapshot */}
