@@ -175,14 +175,13 @@ export const KLINE_MASTER_2026: Skill = {
 此技能库已全面融合经典技术分析与2025年加密顶级交易员实战精华，优先形态与量价共振，辅以指标与链上/资金费率确认，形成最高胜率体系。`
 };
 
-// All available skills
+// All available skills - now only the built-in one, custom skills are managed separately
 export const ALL_SKILLS: Skill[] = [KLINE_MASTER_2026];
 
-// Active skills for analysis
+// For backwards compatibility - active skills are now managed by useSkillManager hook
 export const ACTIVE_SKILLS: Skill[] = [KLINE_MASTER_2026];
 
-// Get the skill-enhanced system prompt
+// Simple getter for default prompt (used when hook is not available)
 export function getSkillEnhancedPrompt(): string {
-  const skill = ACTIVE_SKILLS[0];
-  return skill.prompt;
+  return KLINE_MASTER_2026.prompt;
 }

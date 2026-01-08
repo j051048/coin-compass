@@ -1,5 +1,5 @@
 import { TechnicalAnalysis } from '@/types/trading';
-import { ACTIVE_SKILLS } from '@/lib/skills';
+import { Skill } from '@/lib/skills';
 import { 
   Target, 
   AlertTriangle, 
@@ -17,9 +17,10 @@ import {
 interface AnalysisReportProps {
   analysis: TechnicalAnalysis | null;
   isLoading: boolean;
+  activeSkills?: Skill[];
 }
 
-export function AnalysisReport({ analysis, isLoading }: AnalysisReportProps) {
+export function AnalysisReport({ analysis, isLoading, activeSkills = [] }: AnalysisReportProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -48,7 +49,7 @@ export function AnalysisReport({ analysis, isLoading }: AnalysisReportProps) {
         </p>
         <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
           <p className="text-xs text-primary font-medium mb-1">已加载技能库</p>
-          <p className="text-xs text-muted-foreground">{ACTIVE_SKILLS.map(s => s.name).join(' + ')}</p>
+          <p className="text-xs text-muted-foreground">{activeSkills.length > 0 ? activeSkills.map(s => s.name).join(' + ') : '无'}</p>
         </div>
       </div>
     );
@@ -71,8 +72,8 @@ export function AnalysisReport({ analysis, isLoading }: AnalysisReportProps) {
     <div className="space-y-4">
       {/* Skill Badge */}
       <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 rounded-lg border border-primary/20">
-        <Star className="w-4 h-4 text-primary" />
-        <span className="text-xs text-primary font-medium">技能库: {ACTIVE_SKILLS.map(s => s.name).join(' + ')}</span>
+        <Star className="w-4 h-4 text-primary flex-shrink-0" />
+        <span className="text-xs text-primary font-medium truncate">技能库: {activeSkills.length > 0 ? activeSkills.map(s => s.name).join(' + ') : '无'}</span>
       </div>
 
       {/* Market Snapshot */}

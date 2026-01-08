@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Zap, Eye, EyeOff, RefreshCw, BarChart3, Lock } from 'lucide-react';
+import { Zap, Eye, EyeOff, RefreshCw, BarChart3, Lock, Menu } from 'lucide-react';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { Kline, MarketSnapshot, TimeFrame, IndicatorValues, TechnicalAnalysis } from '@/types/trading';
 import { fetchKlines, fetchMarketSnapshot } from '@/lib/binanceApi';
@@ -15,9 +15,16 @@ import { ApiConfigDialog, getApiConfig } from '@/components/ApiConfigDialog';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { WalletButton } from '@/components/WalletButton';
 import { PaymentPanel } from '@/components/PaymentPanel';
+import { SkillManager } from '@/components/SkillManager';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePaymentGate } from '@/hooks/usePaymentGate';
+import { useSkillManager } from '@/hooks/useSkillManager';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 // Helper functions for localStorage - cache by symbol only (not timeframe)
 const getAnalysisKey = (symbol: string) => `analysis_${symbol}`;
@@ -69,7 +76,11 @@ const Index = () => {
   const [showRSI, setShowRSI] = useState(false);
   const [showKDJ, setShowKDJ] = useState(false);
   const [showWR, setShowWR] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Skill manager hook
+  const { activeSkills, getActivePrompt } = useSkillManager();
   
   // Payment gate hook
   const {
@@ -262,51 +273,98 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-6 h-6 text-primary" />
-                <h1 className="text-lg font-bold gold-text">K线分析大师</h1>
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center justify-between gap-2">
+            {/* Logo & Search */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                <h1 className="text-sm sm:text-lg font-bold gold-text hidden xs:block">K线大师</h1>
               </div>
-              <SymbolSearch value={symbol} onChange={setSymbol} />
-              <ThemeSwitcher />
-              <WalletButton />
+              <div className="flex-1 min-w-0 max-w-[140px] sm:max-w-none">
+                <SymbolSearch value={symbol} onChange={setSymbol} />
+              </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-2">
               <TimeFrameSelector value={timeframe} onChange={setTimeframe} />
-              
+              <SkillManager />
+              <ThemeSwitcher />
+              <WalletButton />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={loadData}
                 disabled={isLoading}
-                className="hover:bg-accent"
+                className="hover:bg-accent h-8 w-8"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
-              
               <ApiConfigDialog />
+            </div>
+
+            {/* Mobile Actions */}
+            <div className="flex md:hidden items-center gap-1">
+              <TimeFrameSelector value={timeframe} onChange={setTimeframe} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={loadData}
+                disabled={isLoading}
+                className="hover:bg-accent h-8 w-8"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px] p-4">
+                  <div className="space-y-4 pt-4">
+                    <p className="text-sm font-medium text-muted-foreground">设置</p>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">主题</span>
+                        <ThemeSwitcher />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">钱包</span>
+                        <WalletButton />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">API配置</span>
+                        <ApiConfigDialog />
+                      </div>
+                    </div>
+                    <div className="border-t border-border pt-4">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">技能库管理</p>
+                      <SkillManager />
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
           {/* Left Panel - Chart & Controls */}
-          <div className="lg:col-span-8 space-y-4">
+          <div className="lg:col-span-8 space-y-3 sm:space-y-4">
             <MarketHeader snapshot={snapshot} isLoading={isLoading} symbol={symbol} />
             
-            {/* Chart Controls */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Chart Controls - Scrollable on mobile */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-thin">
               <Button
                 variant={showMA ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowMA(!showMA)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showMA ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 均线
@@ -315,7 +373,7 @@ const Index = () => {
                 variant={showVOL ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowVOL(!showVOL)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showVOL ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 VOL
@@ -324,7 +382,7 @@ const Index = () => {
                 variant={showBB ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowBB(!showBB)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showBB ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 布林带
@@ -333,7 +391,7 @@ const Index = () => {
                 variant={showMACD ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowMACD(!showMACD)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showMACD ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 MACD
@@ -342,7 +400,7 @@ const Index = () => {
                 variant={showRSI ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowRSI(!showRSI)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showRSI ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 RSI
@@ -351,7 +409,7 @@ const Index = () => {
                 variant={showKDJ ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowKDJ(!showKDJ)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showKDJ ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 KDJ
@@ -360,7 +418,7 @@ const Index = () => {
                 variant={showWR ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowWR(!showWR)}
-                className="text-xs"
+                className="text-xs h-7 px-2 flex-shrink-0"
               >
                 {showWR ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
                 W%R
@@ -368,7 +426,7 @@ const Index = () => {
             </div>
             
             {/* Chart */}
-            <div className="h-[500px]">
+            <div className="h-[300px] sm:h-[400px] lg:h-[500px]">
               <KlineChart 
                 klines={klines} 
                 showMA={showMA}
@@ -382,11 +440,11 @@ const Index = () => {
             </div>
 
             {/* Analysis Button */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <Button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || isLoading || !canUse}
-                className={`w-full py-6 text-lg font-semibold ${!canUse ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full py-4 sm:py-6 text-base sm:text-lg font-semibold ${!canUse ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {!canUse ? (
                   <>
@@ -410,11 +468,18 @@ const Index = () => {
                   onConnect={() => openConnectModal?.()}
                 />
               )}
+              
+              {/* Active Skills Info on Mobile */}
+              {activeSkills.length > 0 && (
+                <div className="lg:hidden p-2 bg-primary/5 rounded-lg border border-primary/20 text-center">
+                  <p className="text-xs text-muted-foreground">已激活技能: <span className="text-primary font-medium">{activeSkills.length}</span></p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Panel - Indicators & Analysis */}
-          <div className="lg:col-span-4 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)] pr-2 scrollbar-custom">
+          <div className="lg:col-span-4 space-y-3 sm:space-y-4 lg:overflow-y-auto lg:max-h-[calc(100vh-120px)] lg:pr-2 scrollbar-custom">
             <IndicatorPanel 
               indicators={indicators} 
               currentPrice={snapshot?.price || 0} 
@@ -422,17 +487,18 @@ const Index = () => {
             
             <AnalysisReport 
               analysis={analysis} 
-              isLoading={isAnalyzing} 
+              isLoading={isAnalyzing}
+              activeSkills={activeSkills}
             />
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-4 mt-8">
-        <div className="container mx-auto px-4 text-center text-xs text-muted-foreground">
+      <footer className="border-t border-border/50 py-3 sm:py-4 mt-4 sm:mt-8">
+        <div className="container mx-auto px-2 sm:px-4 text-center text-[10px] sm:text-xs text-muted-foreground">
           <p>数据来源: Binance API | 本工具仅供参考，不构成投资建议</p>
-          <p className="mt-1">投资有风险，入市需谨慎</p>
+          <p className="mt-0.5 sm:mt-1">投资有风险，入市需谨慎</p>
         </div>
       </footer>
     </div>
