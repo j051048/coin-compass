@@ -128,22 +128,48 @@ const LIGHT_THEMES: { young: ThemeConfig[]; middleAge: ThemeConfig[] } = {
 
 function applyTheme(theme: ThemeConfig, isDark: boolean) {
   const root = document.documentElement;
+  
+  // Add/remove light class for CSS variables
+  if (isDark) {
+    root.classList.remove('light');
+  } else {
+    root.classList.add('light');
+  }
+  
   root.style.setProperty('--primary', theme.primary);
-  root.style.setProperty('--primary-foreground', isDark ? '0 0% 100%' : '0 0% 100%');
+  root.style.setProperty('--primary-foreground', '0 0% 100%');
   root.style.setProperty('--accent', theme.accent);
-  root.style.setProperty('--accent-foreground', theme.foreground);
+  root.style.setProperty('--accent-foreground', isDark ? '0 0% 100%' : theme.foreground);
   root.style.setProperty('--background', theme.bg);
   root.style.setProperty('--foreground', theme.foreground);
   root.style.setProperty('--card', theme.cardBg);
   root.style.setProperty('--card-foreground', theme.foreground);
   root.style.setProperty('--popover', theme.cardBg);
   root.style.setProperty('--popover-foreground', theme.foreground);
-  root.style.setProperty('--muted', theme.cardBg);
+  root.style.setProperty('--muted', isDark ? theme.cardBg : theme.border);
   root.style.setProperty('--muted-foreground', theme.mutedFg);
   root.style.setProperty('--border', theme.border);
-  root.style.setProperty('--input', theme.border);
+  root.style.setProperty('--input', isDark ? theme.border : theme.cardBg);
   root.style.setProperty('--secondary', theme.cardBg);
-  root.style.setProperty('--secondary-foreground', theme.foreground);
+  root.style.setProperty('--secondary-foreground', isDark ? theme.foreground : theme.mutedFg);
+  
+  // Update glass effect variables for light mode
+  if (!isDark) {
+    root.style.setProperty('--glass-bg', '0 0% 100% / 0.85');
+    root.style.setProperty('--glass-border', '0 0% 0% / 0.08');
+    root.style.setProperty('--shadow-sm', '0 2px 8px hsl(0 0% 0% / 0.06)');
+    root.style.setProperty('--shadow-md', '0 4px 16px hsl(0 0% 0% / 0.08)');
+    root.style.setProperty('--shadow-lg', '0 8px 32px hsl(0 0% 0% / 0.10)');
+    root.style.setProperty('--shadow-glass', '0 8px 32px hsl(0 0% 0% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.5)');
+  } else {
+    root.style.setProperty('--glass-bg', `${theme.cardBg} / 0.75`);
+    root.style.setProperty('--glass-border', '0 0% 100% / 0.06');
+    root.style.setProperty('--shadow-sm', '0 2px 8px hsl(0 0% 0% / 0.25)');
+    root.style.setProperty('--shadow-md', '0 4px 16px hsl(0 0% 0% / 0.3)');
+    root.style.setProperty('--shadow-lg', '0 8px 32px hsl(0 0% 0% / 0.35)');
+    root.style.setProperty('--shadow-glass', '0 8px 32px hsl(0 0% 0% / 0.2), inset 0 1px 0 hsl(0 0% 100% / 0.05)');
+  }
+  
   localStorage.setItem('selected-theme', theme.id);
   localStorage.setItem('theme-mode', isDark ? 'dark' : 'light');
 }
