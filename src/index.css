@@ -1,216 +1,563 @@
+/* ============================================
+   NeoVision Studio | 2026 CalmTech Design System
+   AI K-Line Analyzer - Premium Financial UI
+   CalmTech + Glass Morphism Evolution + Minimal Maximalism
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-
+/* ============================================
+   CSS Variables - Dark Mode (Default for Trading)
+   ============================================ */
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
-
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 96%;
-
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 96%;
-
-    --primary: 45 93% 58%;
-    --primary-foreground: 222 47% 6%;
-
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 96%;
-
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 55%;
-
-    --accent: 222 30% 20%;
-    --accent-foreground: 210 40% 96%;
-
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 222 30% 18%;
-    --input: 222 30% 14%;
-    --ring: 45 93% 58%;
-
-    --radius: 0.5rem;
-
-    /* Trading specific colors */
-    --bull: 142 76% 45%;
-    --bull-foreground: 142 76% 95%;
-    --bear: 0 72% 51%;
-    --bear-foreground: 0 72% 95%;
+    /* === Core Colors - CalmTech Dark === */
+    --background: 235 15% 6%;
+    --background-alt: 235 12% 8%;
+    --foreground: 220 15% 95%;
     
-    /* Chart colors */
-    --chart-grid: 222 30% 15%;
-    --chart-crosshair: 45 93% 58%;
+    /* === Card & Surface === */
+    --card: 235 14% 9%;
+    --card-foreground: 220 15% 95%;
     
-    /* Indicator colors */
-    --ma7: 199 89% 48%;
-    --ma21: 280 87% 65%;
+    /* === Popover === */
+    --popover: 235 14% 10%;
+    --popover-foreground: 220 15% 95%;
+    
+    /* === Primary - 2026 Indigo Trust === */
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* === Secondary === */
+    --secondary: 235 12% 14%;
+    --secondary-foreground: 220 10% 85%;
+    
+    /* === Muted === */
+    --muted: 235 10% 16%;
+    --muted-foreground: 220 10% 55%;
+    
+    /* === Accent - Purple Glow === */
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* === Trading Colors === */
+    --bull: 152 69% 48%;
+    --bull-foreground: 0 0% 100%;
+    --bear: 4 90% 58%;
+    --bear-foreground: 0 0% 100%;
+    
+    /* === Semantic === */
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* === UI Elements === */
+    --border: 235 12% 18%;
+    --input: 235 12% 12%;
+    --ring: 239 84% 67%;
+    
+    /* === Radius === */
+    --radius: 12px;
+    
+    /* === Chart Indicators === */
+    --ma7: 199 89% 55%;
+    --ma21: 280 85% 62%;
     --ma50: 45 93% 58%;
-    --ma200: 0 72% 51%;
-    --bb-upper: 280 87% 65%;
-    --bb-lower: 280 87% 65%;
+    --ma200: 4 90% 58%;
+    --bb-upper: 280 85% 62%;
+    --bb-lower: 280 85% 62%;
     --bb-middle: 45 93% 58%;
-
-    /* Gradient */
-    --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
-    --gradient-dark: linear-gradient(180deg, hsl(222 47% 8%), hsl(222 47% 4%));
     
-    /* Shadows */
-    --shadow-glow: 0 0 20px hsl(45 93% 58% / 0.15);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.4);
+    /* === Sidebar === */
+    --sidebar-background: 235 15% 6%;
+    --sidebar-foreground: 220 15% 95%;
+    --sidebar-primary: 239 84% 67%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 235 12% 14%;
+    --sidebar-accent-foreground: 220 15% 95%;
+    --sidebar-border: 235 12% 18%;
+    --sidebar-ring: 239 84% 67%;
+    
+    /* === Glass Effect Variables === */
+    --glass-bg: 235 14% 9% / 0.75;
+    --glass-border: 0 0% 100% / 0.06;
+    --glass-blur: 24px;
+    
+    /* === Shadows === */
+    --shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.25);
+    --shadow-md: 0 4px 16px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.35);
+    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.2), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+    --shadow-glow-primary: 0 0 40px hsl(239 84% 67% / 0.2);
+    --shadow-glow-bull: 0 0 24px hsl(152 69% 48% / 0.25);
+    --shadow-glow-bear: 0 0 24px hsl(4 90% 58% / 0.25);
+  }
 
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 45 93% 58%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 14%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 222 30% 18%;
-    --sidebar-ring: 45 93% 58%;
+  /* === Light Mode === */
+  .light {
+    --background: 220 20% 97%;
+    --background-alt: 220 15% 94%;
+    --foreground: 235 25% 12%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 235 25% 12%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 235 25% 12%;
+    
+    --primary: 239 84% 60%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 235 15% 35%;
+    
+    --muted: 220 12% 90%;
+    --muted-foreground: 220 10% 45%;
+    
+    --accent: 262 83% 55%;
+    --accent-foreground: 0 0% 100%;
+    
+    --bull: 152 69% 40%;
+    --bear: 4 90% 52%;
+    
+    --border: 220 15% 88%;
+    --input: 220 15% 92%;
+    
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 0% / 0.06;
+    
+    --shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 4px 16px hsl(0 0% 0% / 0.08);
+    --shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.10);
+    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.2);
+    --shadow-glow-primary: 0 0 40px hsl(239 84% 60% / 0.12);
   }
 }
 
+/* ============================================
+   Base Styles
+   ============================================ */
 @layer base {
   * {
     @apply border-border;
   }
-
+  
   html {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Subtle noise texture for CalmTech aesthetic */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.02;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    z-index: 9999;
+  }
+  
+  .light body::before {
+    opacity: 0.012;
   }
 
   .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
 }
 
+/* ============================================
+   Component Styles - 2026 CalmTech
+   ============================================ */
 @layer components {
+  /* === Glass Panel - Core Component === */
   .glass-panel {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-lg;
-    box-shadow: var(--shadow-card);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
+    @apply relative overflow-hidden rounded-2xl;
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--shadow-glass);
+    transition: all 0.2s ease;
   }
-
+  
+  .glass-panel:hover {
+    border-color: hsl(var(--primary) / 0.15);
+  }
+  
+  /* === Glass Card === */
+  .glass-card {
+    @apply glass-panel p-4 md:p-6;
+  }
+  
+  /* === Navigation Glass === */
+  .nav-glass {
+    @apply fixed top-0 left-0 right-0 z-50;
+    background: hsl(var(--background) / 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid hsl(var(--glass-border));
+  }
+  
+  /* === Gradient Text - Primary === */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+  }
+  
+  /* === Gold Text (Legacy Support) === */
   .gold-text {
-    background: var(--gradient-gold);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    @apply gradient-text;
   }
-
+  
+  /* === Premium Button === */
+  .btn-premium {
+    @apply relative overflow-hidden rounded-xl font-medium;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    box-shadow: 0 4px 16px hsl(var(--primary) / 0.25);
+    transition: all 0.2s ease;
+  }
+  
+  .btn-premium:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px hsl(var(--primary) / 0.35);
+  }
+  
+  .btn-premium:active {
+    transform: scale(0.98);
+  }
+  
+  /* === Trading Colors === */
   .bull-text {
-    @apply text-[hsl(var(--bull))];
+    @apply text-bull;
   }
-
+  
   .bear-text {
-    @apply text-[hsl(var(--bear))];
+    @apply text-bear;
   }
-
+  
+  .text-bull {
+    color: hsl(var(--bull));
+  }
+  
+  .text-bear {
+    color: hsl(var(--bear));
+  }
+  
+  .bg-bull {
+    background-color: hsl(var(--bull));
+  }
+  
+  .bg-bear {
+    background-color: hsl(var(--bear));
+  }
+  
+  /* === Trading Badges === */
+  .badge-bull {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium;
+    background: hsl(var(--bull) / 0.12);
+    color: hsl(var(--bull));
+    border: 1px solid hsl(var(--bull) / 0.2);
+  }
+  
+  .badge-bear {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium;
+    background: hsl(var(--bear) / 0.12);
+    color: hsl(var(--bear));
+    border: 1px solid hsl(var(--bear) / 0.2);
+  }
+  
+  /* === Indicator Badge === */
   .indicator-badge {
-    @apply px-2 py-0.5 rounded text-xs font-mono font-medium;
+    @apply px-2.5 py-1 rounded-lg text-xs font-mono font-medium;
+    background: hsl(var(--muted) / 0.5);
   }
-
+  
+  /* === Indicator Chip (Toggleable) === */
+  .indicator-chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium;
+    @apply transition-all duration-200 cursor-pointer select-none;
+    background: hsl(var(--muted) / 0.4);
+    border: 1px solid transparent;
+  }
+  
+  .indicator-chip:hover {
+    background: hsl(var(--muted) / 0.6);
+  }
+  
+  .indicator-chip.active {
+    background: hsl(var(--primary) / 0.15);
+    border-color: hsl(var(--primary) / 0.3);
+    color: hsl(var(--primary));
+    box-shadow: 0 0 12px hsl(var(--primary) / 0.15);
+  }
+  
+  /* === Data Labels === */
   .data-label {
-    @apply text-xs text-muted-foreground uppercase tracking-wider;
+    @apply text-xs text-muted-foreground uppercase tracking-wider font-medium;
   }
-
+  
   .data-value {
-    @apply font-mono text-sm font-medium;
+    @apply font-mono text-sm font-semibold;
   }
-
+  
+  /* === Chart Container === */
   .chart-container {
-    @apply rounded-lg overflow-hidden border border-border/30 bg-card;
+    @apply rounded-2xl overflow-hidden border border-border/30 bg-card;
+    box-shadow: var(--shadow-md);
   }
-
+  
+  /* === Analysis Section === */
   .analysis-section {
-    @apply glass-panel p-4 space-y-3;
+    @apply glass-panel p-4 md:p-5 space-y-3;
   }
-
+  
+  /* === Section Title === */
   .section-title {
     @apply text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2;
   }
-
+  
+  .section-title::before {
+    content: '';
+    @apply w-1 h-4 rounded-full;
+    background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent)));
+  }
+  
+  /* === Scenario Cards === */
   .scenario-card {
-    @apply p-3 rounded-lg border;
+    @apply p-4 rounded-xl border transition-all duration-200;
   }
-
+  
   .scenario-bull {
-    @apply scenario-card bg-[hsl(var(--bull))]/5 border-[hsl(var(--bull))]/20;
+    @apply scenario-card;
+    background: hsl(var(--bull) / 0.06);
+    border-color: hsl(var(--bull) / 0.15);
   }
-
+  
+  .scenario-bull:hover {
+    background: hsl(var(--bull) / 0.1);
+    box-shadow: var(--shadow-glow-bull);
+  }
+  
   .scenario-bear {
-    @apply scenario-card bg-[hsl(var(--bear))]/5 border-[hsl(var(--bear))]/20;
+    @apply scenario-card;
+    background: hsl(var(--bear) / 0.06);
+    border-color: hsl(var(--bear) / 0.15);
   }
-
+  
+  .scenario-bear:hover {
+    background: hsl(var(--bear) / 0.1);
+    box-shadow: var(--shadow-glow-bear);
+  }
+  
   .scenario-neutral {
-    @apply scenario-card bg-muted/30 border-muted-foreground/20;
+    @apply scenario-card;
+    background: hsl(var(--muted) / 0.3);
+    border-color: hsl(var(--muted-foreground) / 0.15);
   }
-
-  .pulse-dot {
-    @apply w-2 h-2 rounded-full animate-pulse;
-  }
-
+  
+  /* === Live Indicator === */
   .live-indicator {
     @apply flex items-center gap-1.5 text-xs text-muted-foreground;
   }
-
+  
   .live-indicator::before {
     content: '';
-    @apply pulse-dot bg-[hsl(var(--bull))];
+    @apply w-2 h-2 rounded-full animate-pulse;
+    background: hsl(var(--bull));
+    box-shadow: 0 0 8px hsl(var(--bull) / 0.5);
+  }
+  
+  /* === Price Display === */
+  .price-display {
+    @apply font-mono text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight;
+  }
+  
+  /* === Input Premium === */
+  .input-premium {
+    @apply w-full px-4 py-3 rounded-xl bg-input border border-border/50;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+    @apply transition-all duration-200;
+  }
+  
+  .input-premium:focus {
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1), var(--shadow-sm);
+  }
+  
+  /* === Glow Effects === */
+  .glow-primary {
+    box-shadow: var(--shadow-glow-primary);
+  }
+  
+  .glow-bull {
+    box-shadow: var(--shadow-glow-bull);
+  }
+  
+  .glow-bear {
+    box-shadow: var(--shadow-glow-bear);
   }
 }
 
+/* ============================================
+   Utility Classes
+   ============================================ */
 @layer utilities {
+  /* === Scrollbar - Thin === */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted)) transparent;
   }
-
+  
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
-
+  
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-
+  
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted));
     border-radius: 3px;
   }
-
-  /* Custom scrollbar with visible track and thumb */
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+  
+  /* === Scrollbar - Custom (Visible) === */
   .scrollbar-custom {
     scrollbar-width: auto;
-    scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.3);
+    scrollbar-color: hsl(var(--primary) / 0.4) hsl(var(--muted) / 0.2);
   }
-
+  
   .scrollbar-custom::-webkit-scrollbar {
     width: 8px;
   }
-
+  
   .scrollbar-custom::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.3);
+    background: hsl(var(--muted) / 0.2);
     border-radius: 4px;
   }
-
+  
   .scrollbar-custom::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary) / 0.5);
+    background: hsl(var(--primary) / 0.4);
     border-radius: 4px;
-    border: 1px solid hsl(var(--border));
   }
-
+  
   .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.7);
+    background: hsl(var(--primary) / 0.6);
+  }
+  
+  /* === Hide Scrollbar === */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* === Container === */
+  .container-app {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* === Animation Utilities === */
+  .animate-fade-up {
+    animation: fade-up 0.4s ease-out forwards;
+  }
+  
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out forwards;
+  }
+  
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+}
+
+/* ============================================
+   Keyframe Animations
+   ============================================ */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* ============================================
+   Mobile Optimizations
+   ============================================ */
+@media (max-width: 640px) {
+  :root {
+    --glass-blur: 16px;
+  }
+  
+  .price-display {
+    @apply text-xl;
+  }
+  
+  .glass-panel {
+    @apply rounded-xl;
+  }
+  
+  .analysis-section {
+    @apply p-3;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  body::before {
+    display: none;
+  }
+  
+  .glass-panel {
+    backdrop-filter: none;
+    background: white;
+    border: 1px solid #e5e5e5;
   }
 }
