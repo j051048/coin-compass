@@ -255,86 +255,88 @@ export function MarketHeader({ snapshot, isLoading, symbol = 'BTCUSDT' }: Market
   const dataSource = (snapshot as any).dataSource as DataSource | undefined;
 
   return (
-    <div className="glass-panel p-4">
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold font-mono gold-text">
-              {formatPrice(snapshot.price)}
-            </h1>
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium ${
-              isPositive ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'
-            }`}>
-              <TrendIcon className="w-4 h-4" />
-              {isPositive ? '+' : ''}{snapshot.changePercent24h.toFixed(2)}%
-            </div>
+    <div className="glass-panel p-3 sm:p-4">
+      {/* Top Row: Price and Change */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold font-mono gold-text truncate">
+            {formatPrice(snapshot.price)}
+          </h1>
+          <div className={`flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-medium flex-shrink-0 ${
+            isPositive ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'
+          }`}>
+            <TrendIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+            {isPositive ? '+' : ''}{snapshot.changePercent24h.toFixed(2)}%
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            24h变动: <span className={isPositive ? 'text-bull' : 'text-bear'}>
-              {isPositive ? '+' : ''}{formatPrice(snapshot.change24h)}
-            </span>
-          </p>
         </div>
-
-        {/* 币种简介 */}
-        {coinInfo && (
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Info className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-sm font-semibold text-foreground">{coinInfo.name}</span>
-              <span className="text-xs text-muted-foreground">({baseSymbol})</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-              {coinInfo.description}
-            </p>
-          </div>
-        )}
-
-        {!coinInfo && isSearching && (
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Loader2 className="w-4 h-4 text-primary flex-shrink-0 animate-spin" />
-              <span className="text-sm font-semibold text-foreground">{baseSymbol}</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed flex items-center gap-1">
-              <Search className="w-3 h-3" />
-              正在搜索代币信息...
-            </p>
-          </div>
-        )}
-
-        {!coinInfo && !isSearching && (
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Info className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-sm font-semibold text-foreground">{baseSymbol}</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              暂无该币种的详细介绍信息
-            </p>
-          </div>
-        )}
 
         <div className="live-indicator flex-shrink-0">
-          <span>({dataSource || 'OKX'}) 实时</span>
+          <span className="text-[10px] sm:text-xs">({dataSource || 'OKX'}) 实时</span>
         </div>
       </div>
+      
+      {/* 24h Change */}
+      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+        24h变动: <span className={isPositive ? 'text-bull' : 'text-bear'}>
+          {isPositive ? '+' : ''}{formatPrice(snapshot.change24h)}
+        </span>
+      </p>
 
-      <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
+      {/* Coin Info - Collapsible on mobile */}
+      {coinInfo && (
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-1">
+            <Info className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold text-foreground">{coinInfo.name}</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">({baseSymbol})</span>
+          </div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed line-clamp-2">
+            {coinInfo.description}
+          </p>
+        </div>
+      )}
+
+      {!coinInfo && isSearching && (
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-1">
+            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0 animate-spin" />
+            <span className="text-xs sm:text-sm font-semibold text-foreground">{baseSymbol}</span>
+          </div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed flex items-center gap-1">
+            <Search className="w-3 h-3" />
+            正在搜索代币信息...
+          </p>
+        </div>
+      )}
+
+      {!coinInfo && !isSearching && (
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-1">
+            <Info className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold text-foreground">{baseSymbol}</span>
+          </div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
+            暂无该币种的详细介绍信息
+          </p>
+        </div>
+      )}
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/50">
         <div>
-          <p className="data-label">24H最高</p>
-          <p className="data-value text-bull">{formatPrice(snapshot.high24h)}</p>
+          <p className="data-label text-[10px] sm:text-xs">24H最高</p>
+          <p className="data-value text-bull text-xs sm:text-sm">{formatPrice(snapshot.high24h)}</p>
         </div>
         <div>
-          <p className="data-label">24H最低</p>
-          <p className="data-value text-bear">{formatPrice(snapshot.low24h)}</p>
+          <p className="data-label text-[10px] sm:text-xs">24H最低</p>
+          <p className="data-value text-bear text-xs sm:text-sm">{formatPrice(snapshot.low24h)}</p>
         </div>
         <div>
-          <p className="data-label flex items-center gap-1">
-            <Activity className="w-3 h-3" />
+          <p className="data-label flex items-center gap-1 text-[10px] sm:text-xs">
+            <Activity className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             24H成交量
           </p>
-          <p className="data-value">{formatVolume(snapshot.volume24h)}</p>
+          <p className="data-value text-xs sm:text-sm">{formatVolume(snapshot.volume24h)}</p>
         </div>
       </div>
     </div>

@@ -54,46 +54,46 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
   };
 
   return (
-    <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-2 glass-panel px-3 py-2">
-        <Search className="w-4 h-4 text-muted-foreground" />
+    <div ref={containerRef} className="relative w-full">
+      <div className="flex items-center gap-1.5 sm:gap-2 glass-panel px-2 sm:px-3 py-1.5 sm:py-2">
+        <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value.toUpperCase())}
           onFocus={() => setIsOpen(true)}
-          placeholder={value || '搜索交易对...'}
-          className="bg-transparent border-none outline-none text-sm font-mono w-32 placeholder:text-muted-foreground"
+          placeholder={value || '搜索...'}
+          className="bg-transparent border-none outline-none text-xs sm:text-sm font-mono w-full min-w-0 placeholder:text-muted-foreground"
         />
         {value && (
-          <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded font-mono">
+          <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-primary/20 text-primary rounded font-mono flex-shrink-0">
             {value}
           </span>
         )}
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 glass-panel py-2 z-50 max-h-64 overflow-y-auto scrollbar-thin animate-fade-in">
+        <div className="absolute top-full left-0 right-0 mt-2 glass-panel py-2 z-50 max-h-64 overflow-y-auto scrollbar-thin animate-fade-in min-w-[180px]">
           {!query && (
-            <div className="px-3 py-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="px-3 py-1.5 flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground">
               <TrendingUp className="w-3 h-3" />
               热门交易对
             </div>
           )}
           
           {isLoading ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">加载中...</div>
+            <div className="px-3 py-2 text-xs sm:text-sm text-muted-foreground">加载中...</div>
           ) : suggestions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">未找到交易对</div>
+            <div className="px-3 py-2 text-xs sm:text-sm text-muted-foreground">未找到交易对</div>
           ) : (
             suggestions.map((symbol) => (
               <button
                 key={symbol}
                 onClick={() => handleSelect(symbol)}
-                className="w-full px-3 py-2 text-left text-sm font-mono hover:bg-accent/50 transition-colors flex items-center justify-between group"
+                className="w-full px-3 py-2 text-left text-xs sm:text-sm font-mono hover:bg-accent/50 transition-colors flex items-center justify-between group"
               >
                 <span>{symbol}</span>
-                <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[10px] sm:text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                   选择
                 </span>
               </button>
