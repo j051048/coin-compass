@@ -274,16 +274,16 @@ const Index = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
-          <div className="flex items-center justify-between gap-2">
-            {/* Logo & Search */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                <h1 className="text-sm sm:text-lg font-bold gold-text hidden xs:block">K线大师</h1>
-              </div>
-              <div className="flex-1 min-w-0 max-w-[140px] sm:max-w-none">
-                <SymbolSearch value={symbol} onChange={setSymbol} />
-              </div>
+          <div className="flex items-center gap-2">
+            {/* Logo */}
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <h1 className="text-xs sm:text-lg font-bold gold-text hidden sm:block">K线大师</h1>
+            </div>
+            
+            {/* Search - Flexible */}
+            <div className="flex-1 min-w-0 max-w-[120px] sm:max-w-[200px] md:max-w-none">
+              <SymbolSearch value={symbol} onChange={setSymbol} />
             </div>
             
             {/* Desktop Actions */}
@@ -305,38 +305,42 @@ const Index = () => {
             </div>
 
             {/* Mobile Actions */}
-            <div className="flex md:hidden items-center gap-1">
-              <TimeFrameSelector value={timeframe} onChange={setTimeframe} />
+            <div className="flex md:hidden items-center gap-0.5 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={loadData}
                 disabled={isLoading}
-                className="hover:bg-accent h-8 w-8"
+                className="hover:bg-accent h-7 w-7 sm:h-8 sm:w-8"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Menu className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                    <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[280px] p-4">
                   <div className="space-y-4 pt-4">
-                    <p className="text-sm font-medium text-muted-foreground">设置</p>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">主题</span>
-                        <ThemeSwitcher />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">钱包</span>
-                        <WalletButton />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">API配置</span>
-                        <ApiConfigDialog />
+                    <p className="text-sm font-medium text-muted-foreground">时间周期</p>
+                    <TimeFrameSelector value={timeframe} onChange={setTimeframe} />
+                    
+                    <div className="border-t border-border pt-4">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">设置</p>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">主题</span>
+                          <ThemeSwitcher />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">钱包</span>
+                          <WalletButton />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">API配置</span>
+                          <ApiConfigDialog />
+                        </div>
                       </div>
                     </div>
                     <div className="border-t border-border pt-4">
